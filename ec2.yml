@@ -83,7 +83,7 @@ Resources:
           yum install -y aspnetcore-runtime-6.0 dotnet-sdk-6.0
 
           # Install and configure nginx as reverse proxy
-          yum install -y nginx
+          amazon-linux-extras install nginx1 -y
           systemctl enable nginx
 
           cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
@@ -168,7 +168,7 @@ Resources:
           rpm -Uvh https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
           yum install -y aspnetcore-runtime-6.0 dotnet-sdk-6.0
 
-          yum install -y nginx
+          amazon-linux-extras install nginx1 -y
           systemctl enable nginx
 
           cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
