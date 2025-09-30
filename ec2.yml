@@ -1,0 +1,289 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Deploy two Amazon Linux 2 EC2 instances with .NET 6, nginx reverse proxy, and systemd service.
+  Uses base-stack exports for VPC and public subnets.
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.small
+    Description: EC2 instance type (t3.small aanbevolen voor .NET build/run)
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair for SSH access
+  RepoUrl:
+    Type: String
+    Default: https://github.com/looking4ward/CloudShirt.git
+    Description: Git repository URL for the CloudShirt/eShopOnWeb solution
+  RepoBranch:
+    Type: String
+    Default: main
+    Description: Branch to checkout
+  SSHCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: CIDR allowed to SSH (tighten in production)
+
+Mappings: {}
+
+Resources:
+  # Latest Amazon Linux 2 AMI (x86_64) via SSM dynamic reference
+  AmiParameter:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - Key: Project
+          Value: CloudShirt
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [ !Ref InstanceRole ]
+
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH and HTTP/HTTPS for web access; block app-internal ports
+      VpcId: !ImportValue base-stack:VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref SSHCidr
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: CloudShirt-EC2-SG
+        - Key: Project
+          Value: CloudShirt
+        - Key: Environment
+          Value: dev
+
+  WebInstance1:
+    Type: AWS::EC2::Instance
+    Properties:
+      IamInstanceProfile: !Ref InstanceProfile
+      ImageId: !Ref AmiParameter
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SubnetId: !ImportValue base-stack:CloudShirtFirstSubnet
+      SecurityGroupIds: [ !Ref InstanceSecurityGroup ]
+      Tags:
+        - Key: Name
+          Value: CloudShirt-Web-1
+        - Key: Project
+          Value: CloudShirt
+        - Key: Environment
+          Value: dev
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          # ---------- System update & essentials ----------
+          yum update -y
+          yum install -y gcc git unzip curl amazon-linux-extras
+
+          # ---------- Install Microsoft repo & .NET 6 (runtime + SDK for build) ----------
+          rpm -Uvh https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
+          yum install -y aspnetcore-runtime-6.0 dotnet-sdk-6.0
+
+          # ---------- Install and enable nginx (reverse proxy) ----------
+          yum install -y nginx
+          systemctl enable nginx
+
+          cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
+          server {
+              listen 80;
+              server_name _;
+              # Proxy to Kestrel on localhost:5000
+              location / {
+                  proxy_pass http://127.0.0.1:5000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection keep-alive;
+                  proxy_set_header Host $host;
+                  proxy_cache_bypass $http_upgrade;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_buffering off;
+              }
+          }
+          NGINX
+
+          # ---------- App deploy paths ----------
+          APPROOT="/opt/cloudshirt"
+          PUBLISH="$APPROOT/publish"
+          mkdir -p "$APPROOT"
+          chown ec2-user:ec2-user "$APPROOT"
+
+          # ---------- Clone & build CloudShirt (eShopOnWeb) ----------
+          sudo -u ec2-user bash -lc "
+            set -e
+            if [ ! -d ${APPROOT}/src ]; then
+              git clone --branch ${RepoBranch} ${RepoUrl} ${APPROOT}/src
+            else
+              cd ${APPROOT}/src && git fetch --all && git checkout ${RepoBranch} && git pull
+            fi
+            cd ${APPROOT}/src/src/Web
+            dotnet restore
+            dotnet publish -c Release -o ${PUBLISH}
+          "
+
+          # ---------- systemd service for Kestrel ----------
+          cat >/etc/systemd/system/cloudshirt.service <<'SERVICE'
+          [Unit]
+          Description=CloudShirt ASP.NET Core Web App
+          After=network.target
+
+          [Service]
+          WorkingDirectory=/opt/cloudshirt/publish
+          ExecStart=/usr/bin/dotnet /opt/cloudshirt/publish/Web.dll
+          Restart=always
+          RestartSec=5
+          KillSignal=SIGINT
+          SyslogIdentifier=cloudshirt
+          User=ec2-user
+          Environment=ASPNETCORE_ENVIRONMENT=Production
+          Environment=ASPNETCORE_URLS=http://0.0.0.0:5000
+
+          [Install]
+          WantedBy=multi-user.target
+          SERVICE
+
+          systemctl daemon-reload
+          systemctl enable cloudshirt
+          systemctl start cloudshirt
+
+          systemctl restart nginx
+
+  WebInstance2:
+    Type: AWS::EC2::Instance
+    Properties:
+      IamInstanceProfile: !Ref InstanceProfile
+      ImageId: !Ref AmiParameter
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SubnetId: !ImportValue base-stack:CloudShirtSecondSubnet
+      SecurityGroupIds: [ !Ref InstanceSecurityGroup ]
+      Tags:
+        - Key: Name
+          Value: CloudShirt-Web-2
+        - Key: Project
+          Value: CloudShirt
+        - Key: Environment
+          Value: dev
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          yum update -y
+          yum install -y gcc git unzip curl amazon-linux-extras
+          rpm -Uvh https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
+          yum install -y aspnetcore-runtime-6.0 dotnet-sdk-6.0
+          yum install -y nginx
+          systemctl enable nginx
+
+          cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
+          server {
+              listen 80;
+              server_name _;
+              location / {
+                  proxy_pass http://127.0.0.1:5000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection keep-alive;
+                  proxy_set_header Host $host;
+                  proxy_cache_bypass $http_upgrade;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_buffering off;
+              }
+          }
+          NGINX
+
+          APPROOT="/opt/cloudshirt"
+          PUBLISH="$APPROOT/publish"
+          mkdir -p "$APPROOT"
+          chown ec2-user:ec2-user "$APPROOT"
+
+          sudo -u ec2-user bash -lc "
+            set -e
+            if [ ! -d ${APPROOT}/src ]; then
+              git clone --branch ${RepoBranch} ${RepoUrl} ${APPROOT}/src
+            else
+              cd ${APPROOT}/src && git fetch --all && git checkout ${RepoBranch} && git pull
+            fi
+            cd ${APPROOT}/src/src/Web
+            dotnet restore
+            dotnet publish -c Release -o ${PUBLISH}
+          "
+
+          cat >/etc/systemd/system/cloudshirt.service <<'SERVICE'
+          [Unit]
+          Description=CloudShirt ASP.NET Core Web App
+          After=network.target
+
+          [Service]
+          WorkingDirectory=/opt/cloudshirt/publish
+          ExecStart=/usr/bin/dotnet /opt/cloudshirt/publish/Web.dll
+          Restart=always
+          RestartSec=5
+          KillSignal=SIGINT
+          SyslogIdentifier=cloudshirt
+          User=ec2-user
+          Environment=ASPNETCORE_ENVIRONMENT=Production
+          Environment=ASPNETCORE_URLS=http://0.0.0.0:5000
+
+          [Install]
+          WantedBy=multi-user.target
+          SERVICE
+
+          systemctl daemon-reload
+          systemctl enable cloudshirt
+          systemctl start cloudshirt
+
+          systemctl restart nginx
+
+Outputs:
+  Instance1Id:
+    Description: EC2 Instance 1
+    Value: !Ref WebInstance1
+    Export:
+      Name: !Sub "${AWS::StackName}:Instance1"
+
+  Instance2Id:
+    Description: EC2 Instance 2
+    Value: !Ref WebInstance2
+    Export:
+      Name: !Sub "${AWS::StackName}:Instance2"
+
+  InstanceSecurityGroupRef:
+    Description: Security Group for EC2 Instances
+    Value: !Ref InstanceSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}:InstanceSG"
