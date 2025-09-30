@@ -1,4 +1,4 @@
-Description: Deploy two Ubuntu EC2 instances with Node.js v14 webapp on port 3000
+Description: Deploy two Amazon linux 2 EC2 instances with .NET ..........
 
 Parameters:
   InstanceType:
@@ -34,7 +34,7 @@ Resources:
     Properties:
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
-      ImageId: ami-08c40ec9ead489470 # Ubuntu AMI in us-east-1, pas aan als nodig
+      ImageId: ami-0254b2d5c4c472488 # Amazon linux 2
       SubnetId: subnet-03e5005358a88a123
       SecurityGroupIds:
         - !Ref InstanceSecurityGroup
@@ -56,7 +56,7 @@ Resources:
     Properties:
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
-      ImageId: ami-08c40ec9ead489470
+      ImageId: ami-0254b2d5c4c472488 # Amazon linux 2
       SubnetId: subnet-0a83c991a9b475751
       SecurityGroupIds:
         - !Ref InstanceSecurityGroup
@@ -91,3 +91,4 @@ Outputs:
     Value: !Ref InstanceSecurityGroup
     Export:
       Name: !Sub "${AWS::StackName}:InstanceSG"
+
