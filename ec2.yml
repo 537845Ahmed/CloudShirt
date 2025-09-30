@@ -1,3 +1,4 @@
+AWSTemplateFormatVersion: 2010-09-09
 Description: >
   Deploy two Amazon Linux 2 EC2 instances with .NET 6, nginx reverse proxy,
   and systemd service for the CloudShirt web application.
@@ -24,28 +25,6 @@ Parameters:
     Description: CIDR range allowed to SSH into the instances
 
 Resources:
-  InstanceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ec2.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-      Tags:
-        - Key: Project
-          Value: CloudShirt
-
-  InstanceProfile:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      Roles:
-        - !Ref InstanceRole
-
   InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -83,7 +62,6 @@ Resources:
       ImageId: ami-0254b2d5c4c472488   # Amazon Linux 2 us-east-1
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
-      IamInstanceProfile: !Ref InstanceProfile
       SubnetId: !ImportValue base-stack:CloudShirtFirstSubnet
       SecurityGroupIds:
         - !Ref InstanceSecurityGroup
@@ -171,7 +149,6 @@ Resources:
       ImageId: ami-0254b2d5c4c472488   # Amazon Linux 2 us-east-1
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
-      IamInstanceProfile: !Ref InstanceProfile
       SubnetId: !ImportValue base-stack:CloudShirtSecondSubnet
       SecurityGroupIds:
         - !Ref InstanceSecurityGroup
