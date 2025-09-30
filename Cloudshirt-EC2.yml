@@ -35,7 +35,7 @@ Resources:
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
       ImageId: ami-0254b2d5c4c472488 # Amazon linux 2
-      SubnetId: subnet-03e5005358a88a123
+      SubnetId: !ImportValue base-stack:CloudShirtFirstSubnet
       SecurityGroupIds:
         - !Ref InstanceSecurityGroup
       UserData:
@@ -57,7 +57,7 @@ Resources:
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
       ImageId: ami-0254b2d5c4c472488 # Amazon linux 2
-      SubnetId: subnet-0a83c991a9b475751
+      SubnetId: !ImportValue base-stack:CloudShirtSecondSubnet
       SecurityGroupIds:
         - !Ref InstanceSecurityGroup
       UserData:
@@ -91,4 +91,5 @@ Outputs:
     Value: !Ref InstanceSecurityGroup
     Export:
       Name: !Sub "${AWS::StackName}:InstanceSG"
+
 
