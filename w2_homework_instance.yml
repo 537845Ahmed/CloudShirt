@@ -1,0 +1,78 @@
+Description: Homework - Deploy Public and Private EC2 Instances
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    Description: EC2 instance type
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Existing EC2 KeyPair for SSH access
+
+Resources:
+  InstanceSecurityGroupPublic:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH from anywhere
+      VpcId: !ImportValue base-stack:VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  InstanceSecurityGroupPrivate:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH only from Public Instance
+      VpcId: !ImportValue base-stack:VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref InstanceSecurityGroupPublic
+
+  PublicInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      ImageId: ami-08c40ec9ead489470 # Ubuntu AMI, pas aan per regio
+      SubnetId: !ImportValue base-stack:MyFirstSubnet
+      SecurityGroupIds:
+        - !Ref InstanceSecurityGroupPublic
+
+  PrivateInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      ImageId: ami-08c40ec9ead489470
+      SubnetId: !ImportValue base-stack:MyFirstPrivateSubnet
+      SecurityGroupIds:
+        - !Ref InstanceSecurityGroupPrivate
+
+Outputs:
+  PublicInstanceId:
+    Description: Public EC2 Instance ID
+    Value: !Ref PublicInstance
+    Export:
+      Name: !Sub "${AWS::StackName}:PublicInstance"
+
+  PrivateInstanceId:
+    Description: Private EC2 Instance ID
+    Value: !Ref PrivateInstance
+    Export:
+      Name: !Sub "${AWS::StackName}:PrivateInstance"
+
+  InstanceSecurityGroupPublicRef:
+    Description: Security Group for Public Instance
+    Value: !Ref InstanceSecurityGroupPublic
+    Export:
+      Name: !Sub "${AWS::StackName}:PublicInstanceSG"
+
+  InstanceSecurityGroupPrivateRef:
+    Description: Security Group for Private Instance
+    Value: !Ref InstanceSecurityGroupPrivate
+    Export:
+      Name: !Sub "${AWS::StackName}:PrivateInstanceSG"

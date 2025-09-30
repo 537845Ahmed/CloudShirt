@@ -1,0 +1,93 @@
+Description: Deploy two Ubuntu EC2 instances with Node.js v14 webapp on port 3000
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    Description: EC2 instance type
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair for SSH access
+
+Resources:
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH and HTTP (port 3000)
+      VpcId: !ImportValue base-stack:VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  WebInstance1:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      ImageId: ami-08c40ec9ead489470 # Ubuntu AMI in us-east-1, pas aan als nodig
+      SubnetId: subnet-03e5005358a88a123
+      SecurityGroupIds:
+        - !Ref InstanceSecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          apt update -y
+          apt install -y curl git
+          curl -fsSL https://deb.nodesource.com/setup_14.x | bash -
+          apt install -y nodejs
+          git clone https://github.com/TimothySealy/cac-simple-webapp.git /home/ubuntu/app
+          cd /home/ubuntu/app
+          npm install
+          export PORT=3000
+          nohup node app.js > app.log 2>&1 &
+
+  WebInstance2:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      ImageId: ami-08c40ec9ead489470
+      SubnetId: subnet-0a83c991a9b475751
+      SecurityGroupIds:
+        - !Ref InstanceSecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          apt update -y
+          apt install -y curl git
+          curl -fsSL https://deb.nodesource.com/setup_14.x | bash -
+          apt install -y nodejs
+          git clone https://github.com/TimothySealy/cac-simple-webapp.git /home/ubuntu/app
+          cd /home/ubuntu/app
+          npm install
+          export PORT=3000
+          nohup node app.js > app.log 2>&1 &
+
+Outputs:
+  Instance1Id:
+    Description: EC2 Instance 1
+    Value: !Ref WebInstance1
+    Export:
+      Name: !Sub "${AWS::StackName}:Instance1"
+
+  Instance2Id:
+    Description: EC2 Instance 2
+    Value: !Ref WebInstance2
+    Export:
+      Name: !Sub "${AWS::StackName}:Instance2"
+
+  InstanceSecurityGroupRef:
+    Description: Security Group for EC2 Instances
+    Value: !Ref InstanceSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}:InstanceSG"
