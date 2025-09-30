@@ -93,8 +93,8 @@ Resources:
           Value: CloudShirt
         - Key: Environment
           Value: dev
-      UserData:
-  Fn::Base64: !Sub |
+  UserData:
+    Fn::Base64: !Sub |
     #!/bin/bash -xe
     yum update -y
     yum install -y gcc git unzip curl amazon-linux-extras
@@ -178,8 +178,8 @@ Resources:
           Value: CloudShirt
         - Key: Environment
           Value: dev
-      UserData:
-  Fn::Base64: !Sub |
+  UserData:
+    Fn::Base64: !Sub |
     #!/bin/bash -xe
     yum update -y
     yum install -y gcc git unzip curl amazon-linux-extras
