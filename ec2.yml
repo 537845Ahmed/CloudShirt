@@ -1,13 +1,13 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >
   Deploy two Amazon Linux 2 EC2 instances with .NET 6, nginx reverse proxy, and systemd service.
-  Uses base-stack exports for VPC and public subnets.
+  Uses fixed AMI ID (us-east-1) and base-stack outputs for VPC and subnets.
 
 Parameters:
   InstanceType:
     Type: String
     Default: t3.small
-    Description: EC2 instance type (t3.small aanbevolen voor .NET build/run)
+    Description: EC2 instance type (t3.small aanbevolen voor .NET)
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
     Description: Name of an existing EC2 KeyPair for SSH access
@@ -24,14 +24,7 @@ Parameters:
     Default: 0.0.0.0/0
     Description: CIDR allowed to SSH (tighten in production)
 
-Mappings: {}
-
 Resources:
-  # Latest Amazon Linux 2 AMI (x86_64) via SSM dynamic reference
-  AmiParameter:
-    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
-    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
-
   InstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -56,7 +49,7 @@ Resources:
   InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Enable SSH and HTTP/HTTPS for web access; block app-internal ports
+      GroupDescription: Enable SSH and HTTP/HTTPS for web access
       VpcId: !ImportValue base-stack:VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -87,8 +80,8 @@ Resources:
   WebInstance1:
     Type: AWS::EC2::Instance
     Properties:
+      ImageId: ami-0254b2d5c4c472488   # ✅ Vastgezette AL2 AMI (us-east-1)
       IamInstanceProfile: !Ref InstanceProfile
-      ImageId: !Ref AmiParameter
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
       SubnetId: !ImportValue base-stack:CloudShirtFirstSubnet
@@ -103,15 +96,14 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
-          # ---------- System update & essentials ----------
           yum update -y
           yum install -y gcc git unzip curl amazon-linux-extras
 
-          # ---------- Install Microsoft repo & .NET 6 (runtime + SDK for build) ----------
+          # Install Microsoft repo & .NET 6
           rpm -Uvh https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
           yum install -y aspnetcore-runtime-6.0 dotnet-sdk-6.0
 
-          # ---------- Install and enable nginx (reverse proxy) ----------
+          # Install and configure nginx as reverse proxy
           yum install -y nginx
           systemctl enable nginx
 
@@ -119,7 +111,6 @@ Resources:
           server {
               listen 80;
               server_name _;
-              # Proxy to Kestrel on localhost:5000
               location / {
                   proxy_pass http://127.0.0.1:5000;
                   proxy_http_version 1.1;
@@ -135,26 +126,19 @@ Resources:
           }
           NGINX
 
-          # ---------- App deploy paths ----------
           APPROOT="/opt/cloudshirt"
           PUBLISH="$APPROOT/publish"
           mkdir -p "$APPROOT"
           chown ec2-user:ec2-user "$APPROOT"
 
-          # ---------- Clone & build CloudShirt (eShopOnWeb) ----------
           sudo -u ec2-user bash -lc "
             set -e
-            if [ ! -d ${APPROOT}/src ]; then
-              git clone --branch ${RepoBranch} ${RepoUrl} ${APPROOT}/src
-            else
-              cd ${APPROOT}/src && git fetch --all && git checkout ${RepoBranch} && git pull
-            fi
+            git clone --branch ${RepoBranch} ${RepoUrl} ${APPROOT}/src
             cd ${APPROOT}/src/src/Web
             dotnet restore
             dotnet publish -c Release -o ${PUBLISH}
           "
 
-          # ---------- systemd service for Kestrel ----------
           cat >/etc/systemd/system/cloudshirt.service <<'SERVICE'
           [Unit]
           Description=CloudShirt ASP.NET Core Web App
@@ -178,14 +162,13 @@ Resources:
           systemctl daemon-reload
           systemctl enable cloudshirt
           systemctl start cloudshirt
-
           systemctl restart nginx
 
   WebInstance2:
     Type: AWS::EC2::Instance
     Properties:
+      ImageId: ami-0254b2d5c4c472488   # ✅ Vastgezette AL2 AMI (us-east-1)
       IamInstanceProfile: !Ref InstanceProfile
-      ImageId: !Ref AmiParameter
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
       SubnetId: !ImportValue base-stack:CloudShirtSecondSubnet
@@ -202,8 +185,10 @@ Resources:
           #!/bin/bash -xe
           yum update -y
           yum install -y gcc git unzip curl amazon-linux-extras
+
           rpm -Uvh https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
           yum install -y aspnetcore-runtime-6.0 dotnet-sdk-6.0
+
           yum install -y nginx
           systemctl enable nginx
 
@@ -233,11 +218,7 @@ Resources:
 
           sudo -u ec2-user bash -lc "
             set -e
-            if [ ! -d ${APPROOT}/src ]; then
-              git clone --branch ${RepoBranch} ${RepoUrl} ${APPROOT}/src
-            else
-              cd ${APPROOT}/src && git fetch --all && git checkout ${RepoBranch} && git pull
-            fi
+            git clone --branch ${RepoBranch} ${RepoUrl} ${APPROOT}/src
             cd ${APPROOT}/src/src/Web
             dotnet restore
             dotnet publish -c Release -o ${PUBLISH}
@@ -266,7 +247,6 @@ Resources:
           systemctl daemon-reload
           systemctl enable cloudshirt
           systemctl start cloudshirt
-
           systemctl restart nginx
 
 Outputs:
