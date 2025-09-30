@@ -94,75 +94,73 @@ Resources:
         - Key: Environment
           Value: dev
       UserData:
-        Fn::Base64: !Sub |
-          #!/bin/bash -xe
-          yum update -y
-          yum install -y gcc git unzip curl amazon-linux-extras
+  Fn::Base64: !Sub |
+    #!/bin/bash -xe
+    yum update -y
+    yum install -y gcc git unzip curl amazon-linux-extras
 
-          # Install Microsoft repo & .NET 6
-          rpm -Uvh https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
-          yum install -y aspnetcore-runtime-6.0 dotnet-sdk-6.0
+    rpm -Uvh https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
+    yum install -y aspnetcore-runtime-6.0 dotnet-sdk-6.0
 
-          # Install and configure nginx as reverse proxy
-          yum install -y nginx
-          systemctl enable nginx
+    yum install -y nginx
+    systemctl enable nginx
 
-          cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
-          server {
-              listen 80;
-              server_name _;
-              location / {
-                  proxy_pass http://127.0.0.1:5000;
-                  proxy_http_version 1.1;
-                  proxy_set_header Upgrade $http_upgrade;
-                  proxy_set_header Connection keep-alive;
-                  proxy_set_header Host $host;
-                  proxy_cache_bypass $http_upgrade;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-                  proxy_buffering off;
-              }
-          }
-          NGINX
+    cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
+    server {
+        listen 80;
+        server_name _;
+        location / {
+            proxy_pass http://127.0.0.1:5000;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection keep-alive;
+            proxy_set_header Host $host;
+            proxy_cache_bypass $http_upgrade;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
+        }
+    }
+    NGINX
 
-          APPROOT="/opt/cloudshirt"
-          PUBLISH="$APPROOT/publish"
-          mkdir -p "$APPROOT"
-          chown ec2-user:ec2-user "$APPROOT"
+    APPROOT="/opt/cloudshirt"
+    PUBLISH="$APPROOT/publish"
+    mkdir -p "$APPROOT"
+    chown ec2-user:ec2-user "$APPROOT"
 
-          sudo -u ec2-user bash -lc "
-            set -e
-            git clone --branch ${RepoBranch} ${RepoUrl} ${APPROOT}/src
-            cd ${APPROOT}/src/src/Web
-            dotnet restore
-            dotnet publish -c Release -o ${PUBLISH}
-          "
+    sudo -u ec2-user bash -lc "
+      set -e
+      git clone --branch ${RepoBranch} ${RepoUrl} $APPROOT/src
+      cd $APPROOT/src/src/Web
+      dotnet restore
+      dotnet publish -c Release -o $PUBLISH
+    "
 
-          cat >/etc/systemd/system/cloudshirt.service <<'SERVICE'
-          [Unit]
-          Description=CloudShirt ASP.NET Core Web App
-          After=network.target
+    cat >/etc/systemd/system/cloudshirt.service <<'SERVICE'
+    [Unit]
+    Description=CloudShirt ASP.NET Core Web App
+    After=network.target
 
-          [Service]
-          WorkingDirectory=/opt/cloudshirt/publish
-          ExecStart=/usr/bin/dotnet /opt/cloudshirt/publish/Web.dll
-          Restart=always
-          RestartSec=5
-          KillSignal=SIGINT
-          SyslogIdentifier=cloudshirt
-          User=ec2-user
-          Environment=ASPNETCORE_ENVIRONMENT=Production
-          Environment=ASPNETCORE_URLS=http://0.0.0.0:5000
+    [Service]
+    WorkingDirectory=/opt/cloudshirt/publish
+    ExecStart=/usr/bin/dotnet /opt/cloudshirt/publish/Web.dll
+    Restart=always
+    RestartSec=5
+    KillSignal=SIGINT
+    SyslogIdentifier=cloudshirt
+    User=ec2-user
+    Environment=ASPNETCORE_ENVIRONMENT=Production
+    Environment=ASPNETCORE_URLS=http://0.0.0.0:5000
 
-          [Install]
-          WantedBy=multi-user.target
-          SERVICE
+    [Install]
+    WantedBy=multi-user.target
+    SERVICE
 
-          systemctl daemon-reload
-          systemctl enable cloudshirt
-          systemctl start cloudshirt
-          systemctl restart nginx
+    systemctl daemon-reload
+    systemctl enable cloudshirt
+    systemctl start cloudshirt
+    systemctl restart nginx
 
   WebInstance2:
     Type: AWS::EC2::Instance
@@ -181,73 +179,73 @@ Resources:
         - Key: Environment
           Value: dev
       UserData:
-        Fn::Base64: !Sub |
-          #!/bin/bash -xe
-          yum update -y
-          yum install -y gcc git unzip curl amazon-linux-extras
+  Fn::Base64: !Sub |
+    #!/bin/bash -xe
+    yum update -y
+    yum install -y gcc git unzip curl amazon-linux-extras
 
-          rpm -Uvh https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
-          yum install -y aspnetcore-runtime-6.0 dotnet-sdk-6.0
+    rpm -Uvh https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
+    yum install -y aspnetcore-runtime-6.0 dotnet-sdk-6.0
 
-          yum install -y nginx
-          systemctl enable nginx
+    yum install -y nginx
+    systemctl enable nginx
 
-          cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
-          server {
-              listen 80;
-              server_name _;
-              location / {
-                  proxy_pass http://127.0.0.1:5000;
-                  proxy_http_version 1.1;
-                  proxy_set_header Upgrade $http_upgrade;
-                  proxy_set_header Connection keep-alive;
-                  proxy_set_header Host $host;
-                  proxy_cache_bypass $http_upgrade;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-                  proxy_buffering off;
-              }
-          }
-          NGINX
+    cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
+    server {
+        listen 80;
+        server_name _;
+        location / {
+            proxy_pass http://127.0.0.1:5000;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection keep-alive;
+            proxy_set_header Host $host;
+            proxy_cache_bypass $http_upgrade;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
+        }
+    }
+    NGINX
 
-          APPROOT="/opt/cloudshirt"
-          PUBLISH="$APPROOT/publish"
-          mkdir -p "$APPROOT"
-          chown ec2-user:ec2-user "$APPROOT"
+    APPROOT="/opt/cloudshirt"
+    PUBLISH="$APPROOT/publish"
+    mkdir -p "$APPROOT"
+    chown ec2-user:ec2-user "$APPROOT"
 
-          sudo -u ec2-user bash -lc "
-            set -e
-            git clone --branch ${RepoBranch} ${RepoUrl} ${APPROOT}/src
-            cd ${APPROOT}/src/src/Web
-            dotnet restore
-            dotnet publish -c Release -o ${PUBLISH}
-          "
+    sudo -u ec2-user bash -lc "
+      set -e
+      git clone --branch ${RepoBranch} ${RepoUrl} $APPROOT/src
+      cd $APPROOT/src/src/Web
+      dotnet restore
+      dotnet publish -c Release -o $PUBLISH
+    "
 
-          cat >/etc/systemd/system/cloudshirt.service <<'SERVICE'
-          [Unit]
-          Description=CloudShirt ASP.NET Core Web App
-          After=network.target
+    cat >/etc/systemd/system/cloudshirt.service <<'SERVICE'
+    [Unit]
+    Description=CloudShirt ASP.NET Core Web App
+    After=network.target
 
-          [Service]
-          WorkingDirectory=/opt/cloudshirt/publish
-          ExecStart=/usr/bin/dotnet /opt/cloudshirt/publish/Web.dll
-          Restart=always
-          RestartSec=5
-          KillSignal=SIGINT
-          SyslogIdentifier=cloudshirt
-          User=ec2-user
-          Environment=ASPNETCORE_ENVIRONMENT=Production
-          Environment=ASPNETCORE_URLS=http://0.0.0.0:5000
+    [Service]
+    WorkingDirectory=/opt/cloudshirt/publish
+    ExecStart=/usr/bin/dotnet /opt/cloudshirt/publish/Web.dll
+    Restart=always
+    RestartSec=5
+    KillSignal=SIGINT
+    SyslogIdentifier=cloudshirt
+    User=ec2-user
+    Environment=ASPNETCORE_ENVIRONMENT=Production
+    Environment=ASPNETCORE_URLS=http://0.0.0.0:5000
 
-          [Install]
-          WantedBy=multi-user.target
-          SERVICE
+    [Install]
+    WantedBy=multi-user.target
+    SERVICE
 
-          systemctl daemon-reload
-          systemctl enable cloudshirt
-          systemctl start cloudshirt
-          systemctl restart nginx
+    systemctl daemon-reload
+    systemctl enable cloudshirt
+    systemctl start cloudshirt
+    systemctl restart nginx
 
 Outputs:
   Instance1Id:
