@@ -1,0 +1,266 @@
+Description: >
+  CloudShirt Base Network Stack
+  - VPC (10.0.0.0/16)
+  - 2 public + 2 private subnets
+  - Internet Gateway, NAT Gateway, routing tables
+  - Proper tagging and exports
+
+Parameters:
+  VPCCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC.
+    Type: String
+    Default: 10.0.0.0/16
+
+  PublicSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for public subnet 1
+    Type: String
+    Default: 10.0.1.0/24
+
+  PublicSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for public subnet 2
+    Type: String
+    Default: 10.0.2.0/24
+
+  PrivateSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for private subnet 1
+    Type: String
+    Default: 10.0.51.0/24
+
+  PrivateSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for private subnet 2
+    Type: String
+    Default: 10.0.52.0/24
+
+  AvailabilityZone1:
+    Description: Please enter the name of the first Availability Zone.
+    Type: String
+    Default: us-east-1a
+
+  AvailabilityZone2:
+    Description: Please enter the name of the second Availability Zone.
+    Type: String
+    Default: us-east-1b
+
+Resources:
+  # VPC
+  CloudShirtVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCIDR
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: CloudShirtVpc
+        - Key: Environment
+          Value: dev
+        - Key: Project
+          Value: CloudShirt
+        - Key: Owner
+          Value: TeamCloudShirt
+
+  # Internet Gateway
+  CloudShirtInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: CloudShirtInternetGateway
+        - Key: Project
+          Value: CloudShirt
+
+  # Attach Internet Gateway
+  CloudShirtVPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref CloudShirtInternetGateway
+      VpcId: !Ref CloudShirtVpc
+
+  # Public Subnets
+  CloudShirtFirstSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref PublicSubnet1CIDR
+      AvailabilityZone: !Ref AvailabilityZone1
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref CloudShirtVpc
+      Tags:
+        - Key: Name
+          Value: CloudShirtPublicSubnet1
+        - Key: Environment
+          Value: dev
+        - Key: Project
+          Value: CloudShirt
+
+  CloudShirtSecondSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref PublicSubnet2CIDR
+      AvailabilityZone: !Ref AvailabilityZone2
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref CloudShirtVpc
+      Tags:
+        - Key: Name
+          Value: CloudShirtPublicSubnet2
+        - Key: Environment
+          Value: dev
+        - Key: Project
+          Value: CloudShirt
+
+  # Public Route Table
+  CloudShirtRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref CloudShirtVpc
+      Tags:
+        - Key: Name
+          Value: CloudShirtPublicRouteTable
+        - Key: Project
+          Value: CloudShirt
+
+  # Default route to Internet Gateway
+  CloudShirtDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: CloudShirtVPCGatewayAttachment
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref CloudShirtInternetGateway
+      RouteTableId: !Ref CloudShirtRouteTable
+
+  # Associate public subnets with public route table
+  CloudShirtFirstSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref CloudShirtRouteTable
+      SubnetId: !Ref CloudShirtFirstSubnet
+
+  CloudShirtSecondSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref CloudShirtRouteTable
+      SubnetId: !Ref CloudShirtSecondSubnet
+
+  # Private Subnets
+  CloudShirtFirstPrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      AvailabilityZone: !Ref AvailabilityZone1
+      VpcId: !Ref CloudShirtVpc
+      Tags:
+        - Key: Name
+          Value: CloudShirtPrivateSubnet1
+        - Key: Environment
+          Value: dev
+        - Key: Project
+          Value: CloudShirt
+
+  CloudShirtSecondPrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      AvailabilityZone: !Ref AvailabilityZone2
+      VpcId: !Ref CloudShirtVpc
+      Tags:
+        - Key: Name
+          Value: CloudShirtPrivateSubnet2
+        - Key: Environment
+          Value: dev
+        - Key: Project
+          Value: CloudShirt
+
+  # NAT Gateway (in Public Subnet 1)
+  CloudShirtNatEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: CloudShirtNatEIP
+        - Key: Project
+          Value: CloudShirt
+
+  CloudShirtNatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt CloudShirtNatEIP.AllocationId
+      SubnetId: !Ref CloudShirtFirstSubnet
+      Tags:
+        - Key: Name
+          Value: CloudShirtNatGateway
+        - Key: Project
+          Value: CloudShirt
+
+  # Private Route Table
+  CloudShirtPrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref CloudShirtVpc
+      Tags:
+        - Key: Name
+          Value: CloudShirtPrivateRouteTable
+        - Key: Project
+          Value: CloudShirt
+
+  # Route private traffic to NAT Gateway
+  CloudShirtPrivateDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref CloudShirtNatGateway
+      RouteTableId: !Ref CloudShirtPrivateRouteTable
+
+  # Associate private subnets with private route table
+  CloudShirtPrivateSubnet1Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref CloudShirtPrivateRouteTable
+      SubnetId: !Ref CloudShirtFirstPrivateSubnet
+
+  CloudShirtPrivateSubnet2Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref CloudShirtPrivateRouteTable
+      SubnetId: !Ref CloudShirtSecondPrivateSubnet
+
+Outputs:
+  VPCRef:
+    Description: Reference to the VPC
+    Value: !Ref CloudShirtVpc
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", VPC ] ]
+
+  CloudShirtFirstSubnetRef:
+    Description: Reference to public subnet 1
+    Value: !Ref CloudShirtFirstSubnet
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", CloudShirtFirstSubnet ] ]
+
+  CloudShirtSecondSubnetRef:
+    Description: Reference to public subnet 2
+    Value: !Ref CloudShirtSecondSubnet
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", CloudShirtSecondSubnet ] ]
+
+  CloudShirtFirstPrivateSubnetRef:
+    Description: Reference to private subnet 1
+    Value: !Ref CloudShirtFirstPrivateSubnet
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", CloudShirtFirstPrivateSubnet ] ]
+
+  CloudShirtSecondPrivateSubnetRef:
+    Description: Reference to private subnet 2
+    Value: !Ref CloudShirtSecondPrivateSubnet
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", CloudShirtSecondPrivateSubnet ] ]
+
+  AvailabilityZone1Ref:
+    Description: First Availability Zone
+    Value: !Ref AvailabilityZone1
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", AvailabilityZone1 ] ]
+
+  AvailabilityZone2Ref:
+    Description: Second Availability Zone
+    Value: !Ref AvailabilityZone2
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", AvailabilityZone2 ] ]
