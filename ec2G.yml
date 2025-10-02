@@ -46,6 +46,7 @@ Resources:
         Fn::Base64: !Sub 
           - |
             #!/bin/bash -xe
+            # identiek aan WebInstance1
             yum update -y
             yum install -y gcc git unzip curl amazon-linux-extras
 
@@ -54,6 +55,10 @@ Resources:
 
             amazon-linux-extras install nginx1 -y
             systemctl enable nginx
+
+            mkdir -p /mnt/efs
+            mount -t nfs4 -o tls ${EFS_ID}:/ /mnt/efs
+            echo "${EFS_ID}:/ /mnt/efs nfs4 defaults,_netdev 0 0" >> /etc/fstab
 
             cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
             server {
@@ -70,7 +75,9 @@ Resources:
                     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                     proxy_set_header X-Forwarded-Proto $scheme;
                     proxy_buffering off;
-                }
+                } 
+                access_log /mnt/efs/nginx/access.log;
+                error_log /mnt/efs/nginx/error.log;
             }
             NGINX
 
@@ -79,7 +86,6 @@ Resources:
             mkdir -p "$APPROOT"
             chown ec2-user:ec2-user "$APPROOT"
 
-            # Clone and configure database endpoint
             sudo -u ec2-user bash -lc "
               set -e
               git clone --branch ${RepoBranch} ${RepoUrl} $APPROOT/src
@@ -115,8 +121,9 @@ Resources:
             systemctl start cloudshirt
             systemctl restart nginx
           - RDSENDPOINT: !GetAtt CloudShirtRDSInstance.Endpoint.Address
-            DBUsername: !ImportValue RDSUsername
-            DBPassword: !ImportValue RDSPassword
+            DBUsername: !ImportValue rds-stack:RDSUsername
+            DBPassword: !ImportValue rds-stack:RDSPassword
+            EFS_ID: !ImportValue efs-stack:EFSid
 
   WebInstance2:
     Type: AWS::EC2::Instance
@@ -149,6 +156,10 @@ Resources:
             amazon-linux-extras install nginx1 -y
             systemctl enable nginx
 
+            mkdir -p /mnt/efs
+            mount -t nfs4 -o tls ${EFS_ID}:/ /mnt/efs
+            echo "${EFS_ID}:/ /mnt/efs nfs4 defaults,_netdev 0 0" >> /etc/fstab
+
             cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
             server {
                 listen 80;
@@ -164,7 +175,9 @@ Resources:
                     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                     proxy_set_header X-Forwarded-Proto $scheme;
                     proxy_buffering off;
-                }
+                } 
+                access_log /mnt/efs/nginx/access.log;
+                error_log /mnt/efs/nginx/error.log;
             }
             NGINX
 
@@ -208,8 +221,9 @@ Resources:
             systemctl start cloudshirt
             systemctl restart nginx
           - RDSENDPOINT: !GetAtt CloudShirtRDSInstance.Endpoint.Address
-            DBUsername: !ImportValue RDSUsername
-            DBPassword: !ImportValue RDSPassword
+            DBUsername: !ImportValue rds-stack:RDSUsername
+            DBPassword: !ImportValue rds-stack:RDSPassword
+            EFS_ID: !ImportValue efs-stack:EFSid
 
 Outputs:
   Instance1Id:
