@@ -73,7 +73,7 @@ Resources:
           #!/bin/bash -xe
           # Update system
           dnf update -y
-          dnf install -y java-11 wget curl
+          dnf install -y java-11 wget
 
           # Add Elasticsearch repo
           rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
@@ -134,4 +134,5 @@ Outputs:
     Description: Security Group ID for ELK
     Value: !Ref ELKSecurityGroup
     Export:
+
       Name: !Sub "${AWS::StackName}:ELKSecurityGroup"
