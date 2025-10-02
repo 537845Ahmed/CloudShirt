@@ -120,10 +120,35 @@ Resources:
             systemctl enable cloudshirt
             systemctl start cloudshirt
             systemctl restart nginx
+
+            # Install Filebeat
+            sudo rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
+            cat <<EOF | sudo tee /etc/yum.repos.d/elastic.repo
+            [elastic-8.x]
+            name=Elastic repository for 8.x packages
+            baseurl=https://artifacts.elastic.co/packages/8.x/yum
+            gpgcheck=1
+            gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+            enabled=1
+            autorefresh=1
+            type=rpm-md
+            EOF
+            
+            sudo yum install -y filebeat
+            
+            # Configure Filebeat to send to ELK instance (Logstash)
+            sudo sed -i 's|#output.logstash:|output.logstash:|' /etc/filebeat/filebeat.yml
+            sudo sed -i "s|#  hosts: \[\"localhost:5044\"\]|  hosts: [\"${ELKPrivateIP}:5044\"]|" /etc/filebeat/filebeat.yml
+            
+            sudo filebeat modules enable system
+            sudo systemctl enable filebeat
+            sudo systemctl start filebeat
+            
           - RDSENDPOINT: !GetAtt CloudShirtRDSInstance.Endpoint.Address
             DBUsername: !ImportValue rds-stack:RDSUsername
             DBPassword: !ImportValue rds-stack:RDSPassword
             EFS_ID: !ImportValue efs-stack:EFSid
+            ELKPrivateIP: !ImportValue elk-stack:ELKPrivateIP
 
   WebInstance2:
     Type: AWS::EC2::Instance
@@ -220,10 +245,35 @@ Resources:
             systemctl enable cloudshirt
             systemctl start cloudshirt
             systemctl restart nginx
+
+            # Install Filebeat
+            sudo rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
+            cat <<EOF | sudo tee /etc/yum.repos.d/elastic.repo
+            [elastic-8.x]
+            name=Elastic repository for 8.x packages
+            baseurl=https://artifacts.elastic.co/packages/8.x/yum
+            gpgcheck=1
+            gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+            enabled=1
+            autorefresh=1
+            type=rpm-md
+            EOF
+            
+            sudo yum install -y filebeat
+            
+            # Configure Filebeat to send to ELK instance (Logstash)
+            sudo sed -i 's|#output.logstash:|output.logstash:|' /etc/filebeat/filebeat.yml
+            sudo sed -i "s|#  hosts: \[\"localhost:5044\"\]|  hosts: [\"${ELKPrivateIP}:5044\"]|" /etc/filebeat/filebeat.yml
+            
+            sudo filebeat modules enable system
+            sudo systemctl enable filebeat
+            sudo systemctl start filebeat
+            
           - RDSENDPOINT: !GetAtt CloudShirtRDSInstance.Endpoint.Address
             DBUsername: !ImportValue rds-stack:RDSUsername
             DBPassword: !ImportValue rds-stack:RDSPassword
             EFS_ID: !ImportValue efs-stack:EFSid
+            ELKPrivateIP: !ImportValue elk-stack:ELKPrivateIP
 
 Outputs:
   Instance1Id:
