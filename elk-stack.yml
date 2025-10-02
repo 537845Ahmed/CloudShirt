@@ -1,0 +1,137 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Deploy an ELK (Elastic Stack v8.x) instance on Amazon Linux 2023 for centralized logging
+  including Elasticsearch, Logstash, and Kibana. Used by Filebeat on application servers.
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.medium
+    Description: Instance type for ELK server (minimaal t3.medium aanbevolen)
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair for SSH access
+
+Resources:
+  ELKSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow internal ELK communication within VPC
+      VpcId: !ImportValue base-stack:VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 10.0.0.0/16
+        - IpProtocol: tcp
+          FromPort: 9200
+          ToPort: 9200
+          CidrIp: 10.0.0.0/16
+        - IpProtocol: tcp
+          FromPort: 9300
+          ToPort: 9300
+          CidrIp: 10.0.0.0/16
+        - IpProtocol: tcp
+          FromPort: 5044
+          ToPort: 5044
+          CidrIp: 10.0.0.0/16
+        - IpProtocol: tcp
+          FromPort: 5601
+          ToPort: 5601
+          CidrIp: 10.0.0.0/16
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: CloudShirt-ELK-SG
+        - Key: Project
+          Value: CloudShirt
+        - Key: Environment
+          Value: dev
+
+  ELKInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-052064a798f08f0d3  # Amazon Linux 2023 us-east-1
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SubnetId: !ImportValue base-stack:CloudShirtSecondPrivateSubnet
+      SecurityGroupIds:
+        - !Ref ELKSecurityGroup
+      Tags:
+        - Key: Name
+          Value: CloudShirt-ELK
+        - Key: Project
+          Value: CloudShirt
+        - Key: Environment
+          Value: dev
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          # Update system
+          dnf update -y
+          dnf install -y java-11 wget curl
+
+          # Add Elasticsearch repo
+          rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
+          cat <<EOF > /etc/yum.repos.d/elastic.repo
+          [elasticsearch]
+          name=Elasticsearch repository for 8.x packages
+          baseurl=https://artifacts.elastic.co/packages/8.x/yum
+          gpgcheck=1
+          gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+          enabled=1
+          autorefresh=1
+          type=rpm-md
+          EOF
+
+          # Install Elasticsearch
+          dnf install -y elasticsearch
+          # Configure Elasticsearch
+          sed -i 's|#network.host: 192.168.0.1|network.host: 0.0.0.0|' /etc/elasticsearch/elasticsearch.yml
+          echo "http.port: 9200" >> /etc/elasticsearch/elasticsearch.yml
+          echo "xpack.security.enabled: false" >> /etc/elasticsearch/elasticsearch.yml
+          systemctl enable elasticsearch
+          systemctl start elasticsearch
+
+          # Install Logstash
+          dnf install -y logstash
+          cat <<EOF > /etc/logstash/conf.d/logstash.conf
+          input {
+            beats {
+              port => 5044
+            }
+          }
+          output {
+            elasticsearch {
+              hosts => ["http://localhost:9200"]
+              manage_template => false
+              index => "%{[@metadata][beat]}-%{[@metadata][version]}-%{+YYYY.MM.dd}"
+            }
+          }
+          EOF
+          systemctl enable logstash
+          systemctl start logstash
+
+          # Install Kibana
+          dnf install -y kibana
+          sed -i 's|#server.host: "localhost"|server.host: "0.0.0.0"|' /etc/kibana/kibana.yml
+          sed -i 's|#elasticsearch.hosts:.*|elasticsearch.hosts: ["http://localhost:9200"]|' /etc/kibana/kibana.yml
+          systemctl enable kibana
+          systemctl start kibana
+
+Outputs:
+  ELKPrivateIP:
+    Description: Private IP address of the ELK instance (for Filebeat configuration)
+    Value: !GetAtt ELKInstance.PrivateIp
+    Export:
+      Name: !Sub "${AWS::StackName}:ELKPrivateIP"
+
+  ELKSecurityGroupExport:
+    Description: Security Group ID for ELK
+    Value: !Ref ELKSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}:ELKSecurityGroup"
