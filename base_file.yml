@@ -221,6 +221,55 @@ Resources:
     Properties:
       RouteTableId: !Ref CloudShirtPrivateRouteTable
       SubnetId: !Ref CloudShirtSecondPrivateSubnet
+      
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH, HTTP and HTTPS traffic
+      VpcId: !Ref CloudShirtVpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref SSHCidr
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: CloudShirt-EC2-SG
+        - Key: Project
+          Value: CloudShirt
+        - Key: Environment
+          Value: dev
+  
+  RdsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SQL Server traffic from VPC
+      VpcId: !ImportValue base-stack:VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 1433
+          ToPort: 1433
+          CidrIp: 10.0.0.0/16
+      Tags:
+        - Key: Name
+          Value: CloudShirt-RDS-SG
+        - Key: Project
+          Value: CloudShirt
+        - Key: Environment
+          Value: dev
 
 Outputs:
   VPCRef:
@@ -264,3 +313,16 @@ Outputs:
     Value: !Ref AvailabilityZone2
     Export:
       Name: !Join [ ":", [ !Ref "AWS::StackName", AvailabilityZone2 ] ]
+      
+  InstanceSecurityGroupRef:
+    Description: EC2 instance SG
+    Value: !Ref InstanceSecurityGroup
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", InstanceSG ] ]
+
+  RdsSecurityGroupRef:
+    Description: RDS instance SG
+    Value: !Ref RdsSecurityGroup
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", rdsSG ] ]
+      
