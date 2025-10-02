@@ -42,7 +42,7 @@ Resources:
         - !ImportValue base-stack:CloudShirtFirstSubnet
         - !ImportValue base-stack:CloudShirtSecondSubnet
       SecurityGroups:
-        - !Ref ec2-stack:InstanceSecurityGroup
+        - !ImportValue ec2-stack:InstanceSecurityGroup
       Scheme: internet-facing
       Type: application
 
