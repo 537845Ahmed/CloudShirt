@@ -57,3 +57,15 @@ Outputs:
     Value: !GetAtt CloudShirtRDSInstance.Endpoint.Address
     Export:
       Name: !Sub "${AWS::StackName}:RDSEndpointAddress"
+
+  RDSUsername:
+    Description: The RDS master username
+    Value: !Ref DBUsername
+    Export:
+      Name: !Sub "${AWS::StackName}:RDSUsername"
+
+  RDSPassword:
+    Description: The RDS master password
+    Value: !Ref DBPassword
+    Export:
+      Name: !Sub "${AWS::StackName}:RDSPassword"
