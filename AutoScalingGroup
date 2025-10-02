@@ -1,0 +1,137 @@
+Description: CloudShirt .NET Auto Scaling Group for spike traffic (6-8 PM ET)
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.small
+    Description: EC2 instance for ASG
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair
+  RepoUrl:
+    Type: String
+    Default: https://github.com/looking4ward/CloudShirt.git
+    Description: Git repository URL for the CloudShirt solution
+  RepoBranch:
+    Type: String
+    Default: main
+    Description: Branch to checkout
+
+Resources:
+  CloudShirtLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: CloudShirtLaunchTemplate
+      LaunchTemplateData:
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        ImageId: ami-0254b2d5c4c472488
+        SecurityGroupIds:
+          - !ImportValue ec2-stack:InstanceSG
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash -xe
+            yum update -y
+            yum install -y gcc git unzip curl amazon-linux-extras
+
+            rpm -Uvh https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
+            yum install -y aspnetcore-runtime-6.0 dotnet-sdk-6.0
+
+            amazon-linux-extras install nginx1 -y
+            systemctl enable nginx
+
+            cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
+            server {
+                listen 80;
+                server_name _;
+                location / {
+                    proxy_pass http://127.0.0.1:5000;
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade $http_upgrade;
+                    proxy_set_header Connection keep-alive;
+                    proxy_set_header Host $host;
+                    proxy_cache_bypass $http_upgrade;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                    proxy_buffering off;
+                }
+            }
+            NGINX
+
+            APPROOT="/opt/cloudshirt"
+            PUBLISH="$APPROOT/publish"
+            mkdir -p "$APPROOT"
+            chown ec2-user:ec2-user "$APPROOT"
+
+            sudo -u ec2-user bash -lc "
+              set -e
+              git clone --branch ${RepoBranch} ${RepoUrl} $APPROOT/src
+              cd $APPROOT/src/src/Web
+              dotnet restore
+              dotnet publish -c Release -o $PUBLISH
+            "
+
+            cat >/etc/systemd/system/cloudshirt.service <<'SERVICE'
+            [Unit]
+            Description=CloudShirt ASP.NET Core Web App
+            After=network.target
+
+            [Service]
+            WorkingDirectory=/opt/cloudshirt/publish
+            ExecStart=/usr/bin/dotnet /opt/cloudshirt/publish/Web.dll
+            Restart=always
+            RestartSec=5
+            KillSignal=SIGINT
+            SyslogIdentifier=cloudshirt
+            User=ec2-user
+            Environment=ASPNETCORE_ENVIRONMENT=Production
+            Environment=ASPNETCORE_URLS=http://0.0.0.0:5000
+
+            [Install]
+            WantedBy=multi-user.target
+            SERVICE
+
+            systemctl daemon-reload
+            systemctl enable cloudshirt
+            systemctl start cloudshirt
+            systemctl restart nginx
+
+  CloudShirtASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: CloudShirtASG
+      LaunchTemplate:
+        LaunchTemplateId: !Ref CloudShirtLaunchTemplate
+        Version: !GetAtt CloudShirtLaunchTemplate.LatestVersionNumber
+      MinSize: 2
+      MaxSize: 3
+      DesiredCapacity: 2
+      VPCZoneIdentifier: 
+        - !ImportValue base-stack:CloudShirtFirstSubnet
+        - !ImportValue base-stack:CloudShirtSecondSubnet
+      Tags:
+        - Key: Name
+          Value: CloudShirt-Web-ASG
+          PropagateAtLaunch: true
+
+  ScaleOutScheduledAction:
+    Type: AWS::AutoScaling::ScheduledAction
+    Properties:
+      AutoScalingGroupName: !Ref CloudShirtASG
+      ScheduledActionName: ScaleOutSpikeHours
+      DesiredCapacity: 3
+      Recurrence: "0 12 * * *"
+
+  ScaleInScheduledAction:
+    Type: AWS::AutoScaling::ScheduledAction
+    Properties:
+      AutoScalingGroupName: !Ref CloudShirtASG
+      ScheduledActionName: ScaleInAfterSpike
+      DesiredCapacity: 2
+      Recurrence: "0 13 * * *"
+
+# Outputs:
+#   ASGName:
+#     Description: Name of the Auto Scaling Group
+#     Value: !Ref CloudShirtASG
