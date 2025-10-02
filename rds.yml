@@ -42,7 +42,7 @@ Resources:
       LicenseModel: license-included
       MonitoringInterval: 0
       VPCSecurityGroups:
-        - !ImportValue base-stack:RdsSecurityGroup
+        - !ImportValue base-stack:rdsSG
       DBSubnetGroupName: !Ref CloudShirtDBSubnetGroup
       PubliclyAccessible: false
       BackupRetentionPeriod: 1
