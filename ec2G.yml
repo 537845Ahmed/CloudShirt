@@ -59,8 +59,8 @@ Resources:
 
             # EFS Mount
             mkdir -p /mnt/efs
-            mount -t efs -o tls ${EFS_ID}:/ /mnt/efs
-            echo "${EFS_ID}:/ /mnt/efs efs defaults,_netdev 0 0" >> /etc/fstab
+            mount -t efs -o tls ${EFS_DNS}:/ /mnt/efs
+            echo "${EFS_DNS}:/ /mnt/efs efs defaults,_netdev 0 0" >> /etc/fstab
 
             # Nginx directory maken voor logs
             mkdir -p /mnt/efs/nginx
@@ -179,7 +179,7 @@ Resources:
           - RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
             DBUsername: !ImportValue rds-stack:RDSUsername
             DBPassword: !ImportValue rds-stack:RDSPassword
-            EFS_ID: !ImportValue efs-stack:EFSid
+            EFS_DNS: !ImportValue efs-stack:EFSDNS
             ELKPublicIP: !ImportValue elk-stack:ELKPublicIP
 
   ## =========================
@@ -216,8 +216,8 @@ Resources:
 
             # EFS Mount
             mkdir -p /mnt/efs/
-            mount -t efs -o tls ${EFS_ID}:/ /mnt/efs
-            echo "${EFS_ID}:/ /mnt/efs efs defaults,_netdev 0 0" >> /etc/fstab
+            mount -t efs -o tls ${EFS_DNS}:/ /mnt/efs
+            echo "${EFS_DNS}:/ /mnt/efs efs defaults,_netdev 0 0" >> /etc/fstab
 
             # Nginx directory maken voor logs
             mkdir -p /mnt/efs/nginx
@@ -335,7 +335,7 @@ Resources:
           - RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
             DBUsername: !ImportValue rds-stack:RDSUsername
             DBPassword: !ImportValue rds-stack:RDSPassword
-            EFS_ID: !ImportValue efs-stack:EFSid
+            EFS_DNS: !ImportValue efs-stack:EFSDNS
             ELKPublicIP: !ImportValue elk-stack:ELKPublicIP
 
 Outputs:
