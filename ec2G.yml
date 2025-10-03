@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >
   Deploy Amazon RDS SQL Server instance and two Amazon Linux 2 EC2 instances with .NET 6, 
-  nginx reverse proxy, and CloudShirt web app configured to use the RDS database.
+  nginx reverse proxy, CloudShirt web app, and Filebeat configuration for centralized logging to ELK.
 
 Parameters:
   InstanceType:
@@ -25,11 +25,13 @@ Parameters:
     Description: CIDR range allowed to SSH into the instances
 
 Resources:
+  ## =========================
+  ## Web Instance 1
+  ## =========================
   WebInstance1:
     Type: AWS::EC2::Instance
-    DependsOn: CloudShirtRDSInstance
     Properties:
-      ImageId: ami-0254b2d5c4c472488
+      ImageId: ami-0254b2d5c4c472488 # Amazon Linux 2
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
       SubnetId: !ImportValue base-stack:CloudShirtFirstSubnet
@@ -43,10 +45,9 @@ Resources:
         - Key: Environment
           Value: dev
       UserData:
-        Fn::Base64: !Sub 
+        Fn::Base64: !Sub
           - |
             #!/bin/bash -xe
-            # identiek aan WebInstance1
             yum update -y
             yum install -y gcc git unzip curl amazon-linux-extras
 
@@ -56,10 +57,12 @@ Resources:
             amazon-linux-extras install nginx1 -y
             systemctl enable nginx
 
-            mkdir -p /mnt/efs
-            mount -t nfs4 -o tls ${EFS_ID}:/ /mnt/efs
-            echo "${EFS_ID}:/ /mnt/efs nfs4 defaults,_netdev 0 0" >> /etc/fstab
+            # EFS Mount (optioneel)
+            # mkdir -p /mnt/efs
+            # mount -t nfs4 -o tls ${EFS_ID}:/ /mnt/efs
+            # echo "${EFS_ID}:/ /mnt/efs nfs4 defaults,_netdev 0 0" >> /etc/fstab
 
+            # Nginx config
             cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
             server {
                 listen 80;
@@ -75,9 +78,7 @@ Resources:
                     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                     proxy_set_header X-Forwarded-Proto $scheme;
                     proxy_buffering off;
-                } 
-                access_log /mnt/efs/nginx/access.log;
-                error_log /mnt/efs/nginx/error.log;
+                }
             }
             NGINX
 
@@ -96,6 +97,7 @@ Resources:
               dotnet publish -c Release -o $PUBLISH
             "
 
+            # Systemd service
             cat >/etc/systemd/system/cloudshirt.service <<'SERVICE'
             [Unit]
             Description=CloudShirt ASP.NET Core Web App
@@ -122,8 +124,9 @@ Resources:
             systemctl restart nginx
 
             # Install Filebeat
-            sudo rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
-            cat <<EOF | sudo tee /etc/yum.repos.d/elastic.repo
+            rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
+
+            cat <<EOF > /etc/yum.repos.d/elastic.repo
             [elastic-8.x]
             name=Elastic repository for 8.x packages
             baseurl=https://artifacts.elastic.co/packages/8.x/yum
@@ -133,26 +136,49 @@ Resources:
             autorefresh=1
             type=rpm-md
             EOF
-            
-            sudo yum install -y filebeat
-            
-            # Configure Filebeat to send to ELK instance (Logstash)
-            sudo sed -i 's|#output.logstash:|output.logstash:|' /etc/filebeat/filebeat.yml
-            sudo sed -i "s|#  hosts: \[\"localhost:5044\"\]|  hosts: [\"${ELKPrivateIP}:5044\"]|" /etc/filebeat/filebeat.yml
-            
-            sudo filebeat modules enable system
-            sudo systemctl enable filebeat
-            sudo systemctl start filebeat
-            
-          - RDSENDPOINT: !GetAtt CloudShirtRDSInstance.Endpoint.Address
+
+            yum install -y filebeat
+
+            # Disable default Elasticsearch output (to avoid multiple outputs)
+            sed -i 's/^output.elasticsearch:/#output.elasticsearch:/' /etc/filebeat/filebeat.yml
+            sed -i 's/^  hosts:/#  hosts:/' /etc/filebeat/filebeat.yml
+
+            # Append clean Logstash output block at the end of filebeat.yml
+            cat <<EOT >> /etc/filebeat/filebeat.yml
+
+            output.logstash:
+              hosts: ["${ELKPublicIP}:5044"]
+            EOT
+
+            # Enable system module for Filebeat
+            filebeat modules enable system
+
+            # Configure system module (syslog + auth)
+            cat <<EOF > /etc/filebeat/modules.d/system.yml
+            - module: system
+              syslog:
+                enabled: true
+                var.paths: ["/var/log/messages"]
+              auth:
+                enabled: true
+                var.paths: ["/var/log/secure"]
+            EOF
+
+            # Enable and start Filebeat
+            systemctl enable filebeat
+            systemctl restart filebeat
+
+          - RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
             DBUsername: !ImportValue rds-stack:RDSUsername
             DBPassword: !ImportValue rds-stack:RDSPassword
             EFS_ID: !ImportValue efs-stack:EFSid
-            ELKPrivateIP: !ImportValue elk-stack:ELKPrivateIP
+            ELKPublicIP: !ImportValue elk-stack:ELKPublicIP
 
+  ## =========================
+  ## Web Instance 2 (identiek)
+  ## =========================
   WebInstance2:
     Type: AWS::EC2::Instance
-    DependsOn: CloudShirtRDSInstance
     Properties:
       ImageId: ami-0254b2d5c4c472488
       InstanceType: !Ref InstanceType
@@ -171,7 +197,6 @@ Resources:
         Fn::Base64: !Sub 
           - |
             #!/bin/bash -xe
-            # identiek aan WebInstance1
             yum update -y
             yum install -y gcc git unzip curl amazon-linux-extras
 
@@ -181,10 +206,12 @@ Resources:
             amazon-linux-extras install nginx1 -y
             systemctl enable nginx
 
-            mkdir -p /mnt/efs
-            mount -t nfs4 -o tls ${EFS_ID}:/ /mnt/efs
-            echo "${EFS_ID}:/ /mnt/efs nfs4 defaults,_netdev 0 0" >> /etc/fstab
+            # EFS Mount (optioneel)
+            # mkdir -p /mnt/efs
+            # mount -t nfs4 -o tls ${EFS_ID}:/ /mnt/efs
+            # echo "${EFS_ID}:/ /mnt/efs nfs4 defaults,_netdev 0 0" >> /etc/fstab
 
+            # Nginx config
             cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
             server {
                 listen 80;
@@ -200,9 +227,7 @@ Resources:
                     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                     proxy_set_header X-Forwarded-Proto $scheme;
                     proxy_buffering off;
-                } 
-                access_log /mnt/efs/nginx/access.log;
-                error_log /mnt/efs/nginx/error.log;
+                }
             }
             NGINX
 
@@ -221,6 +246,7 @@ Resources:
               dotnet publish -c Release -o $PUBLISH
             "
 
+            # Systemd service
             cat >/etc/systemd/system/cloudshirt.service <<'SERVICE'
             [Unit]
             Description=CloudShirt ASP.NET Core Web App
@@ -247,8 +273,9 @@ Resources:
             systemctl restart nginx
 
             # Install Filebeat
-            sudo rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
-            cat <<EOF | sudo tee /etc/yum.repos.d/elastic.repo
+            rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
+
+            cat <<EOF > /etc/yum.repos.d/elastic.repo
             [elastic-8.x]
             name=Elastic repository for 8.x packages
             baseurl=https://artifacts.elastic.co/packages/8.x/yum
@@ -258,22 +285,43 @@ Resources:
             autorefresh=1
             type=rpm-md
             EOF
+
+            yum install -y filebeat
+
+            # Disable default Elasticsearch output (to avoid multiple outputs)
+            sed -i 's/^output.elasticsearch:/#output.elasticsearch:/' /etc/filebeat/filebeat.yml
+            sed -i 's/^  hosts:/#  hosts:/' /etc/filebeat/filebeat.yml
+
+            # Append clean Logstash output block at the end of filebeat.yml
+            cat <<EOT >> /etc/filebeat/filebeat.yml
+
+            output.logstash:
+              hosts: ["${ELKPublicIP}:5044"]
+            EOT
+
+            # Enable system module for Filebeat
+            filebeat modules enable system
+
+            # Configure system module (syslog + auth)
+            cat <<EOF > /etc/filebeat/modules.d/system.yml
+            - module: system
+              syslog:
+                enabled: true
+                var.paths: ["/var/log/messages"]
+              auth:
+                enabled: true
+                var.paths: ["/var/log/secure"]
+            EOF
+
+            # Enable and start Filebeat
+            systemctl enable filebeat
+            systemctl restart filebeat
             
-            sudo yum install -y filebeat
-            
-            # Configure Filebeat to send to ELK instance (Logstash)
-            sudo sed -i 's|#output.logstash:|output.logstash:|' /etc/filebeat/filebeat.yml
-            sudo sed -i "s|#  hosts: \[\"localhost:5044\"\]|  hosts: [\"${ELKPrivateIP}:5044\"]|" /etc/filebeat/filebeat.yml
-            
-            sudo filebeat modules enable system
-            sudo systemctl enable filebeat
-            sudo systemctl start filebeat
-            
-          - RDSENDPOINT: !GetAtt CloudShirtRDSInstance.Endpoint.Address
+          - RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
             DBUsername: !ImportValue rds-stack:RDSUsername
             DBPassword: !ImportValue rds-stack:RDSPassword
             EFS_ID: !ImportValue efs-stack:EFSid
-            ELKPrivateIP: !ImportValue elk-stack:ELKPrivateIP
+            ELKPublicIP: !ImportValue elk-stack:ELKPublicIP
 
 Outputs:
   Instance1Id:
