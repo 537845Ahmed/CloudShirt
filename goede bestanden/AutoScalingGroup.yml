@@ -8,6 +8,7 @@ Parameters:
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
     Description: Name of an existing EC2 KeyPair
+    Default: vockey
   RepoUrl:
     Type: String
     Default: https://github.com/looking4ward/CloudShirt.git
