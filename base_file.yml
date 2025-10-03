@@ -40,6 +40,12 @@ Parameters:
     Description: Please enter the name of the second Availability Zone.
     Type: String
     Default: us-east-1b
+  
+  SSHCidr:
+    Description: The IP range that can SSH to EC2 instances
+    Type: String
+    Default: 0.0.0.0/0
+  
 
 Resources:
   # VPC
@@ -257,7 +263,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow SQL Server traffic from VPC
-      VpcId: !ImportValue base-stack:VPC
+      VpcId: !Ref CloudShirtVpc
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 1433
