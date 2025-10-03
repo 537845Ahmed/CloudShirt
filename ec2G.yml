@@ -57,7 +57,7 @@ Resources:
             amazon-linux-extras install nginx1 -y
             systemctl enable nginx
 
-            # EFS Mount (optioneel)
+            # EFS Mount
             # mkdir -p /mnt/efs
             # mount -t nfs4 -o tls ${EFS_ID}:/ /mnt/efs
             # echo "${EFS_ID}:/ /mnt/efs nfs4 defaults,_netdev 0 0" >> /etc/fstab
@@ -79,6 +79,8 @@ Resources:
                     proxy_set_header X-Forwarded-Proto $scheme;
                     proxy_buffering off;
                 }
+                #access_log /mnt/efs/nginx/access.log;
+                #error_log /mnt/efs/nginx/error.log;
             }
             NGINX
 
@@ -206,7 +208,7 @@ Resources:
             amazon-linux-extras install nginx1 -y
             systemctl enable nginx
 
-            # EFS Mount (optioneel)
+            # EFS Mount
             # mkdir -p /mnt/efs
             # mount -t nfs4 -o tls ${EFS_ID}:/ /mnt/efs
             # echo "${EFS_ID}:/ /mnt/efs nfs4 defaults,_netdev 0 0" >> /etc/fstab
@@ -228,6 +230,8 @@ Resources:
                     proxy_set_header X-Forwarded-Proto $scheme;
                     proxy_buffering off;
                 }
+                #access_log /mnt/efs/nginx/access.log;
+                #error_log /mnt/efs/nginx/error.log;
             }
             NGINX
 
