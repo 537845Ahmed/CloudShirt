@@ -28,7 +28,7 @@ Resources:
         KeyName: !Ref KeyName
         ImageId: ami-0254b2d5c4c472488
         SecurityGroupIds:
-          - !ImportValue ec2-stack:InstanceSG
+          - !ImportValue base-stack:InstanceSG
         UserData:
           Fn::Base64: !Sub |
             #!/bin/bash -xe
