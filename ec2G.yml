@@ -49,7 +49,7 @@ Resources:
           - |
             #!/bin/bash -xe
             yum update -y
-            yum install -y gcc git unzip curl amazon-linux-extras
+            yum install -y gcc git unzip curl amazon-linux-extras amazon-efs-utils
 
             rpm -Uvh https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
             yum install -y aspnetcore-runtime-6.0 dotnet-sdk-6.0
@@ -58,10 +58,14 @@ Resources:
             systemctl enable nginx
 
             # EFS Mount
-            # mkdir -p /mnt/efs
-            # mount -t nfs4 -o tls ${EFS_ID}:/ /mnt/efs
-            # echo "${EFS_ID}:/ /mnt/efs nfs4 defaults,_netdev 0 0" >> /etc/fstab
+            mkdir -p /mnt/efs
+            mount -t efs -o tls ${EFS_ID}:/ /mnt/efs
+            echo "${EFS_ID}:/ /mnt/efs efs defaults,_netdev 0 0" >> /etc/fstab
 
+            # Nginx directory maken voor logs
+            mkdir -p /mnt/efs/nginx
+
+            
             # Nginx config
             cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
             server {
@@ -79,8 +83,9 @@ Resources:
                     proxy_set_header X-Forwarded-Proto $scheme;
                     proxy_buffering off;
                 }
-                #access_log /mnt/efs/nginx/access.log;
-                #error_log /mnt/efs/nginx/error.log;
+                # Access en error log op EFS wegschrijven
+                access_log /mnt/efs/nginx/access.log;
+                error_log /mnt/efs/nginx/error.log;
             }
             NGINX
 
@@ -89,6 +94,7 @@ Resources:
             mkdir -p "$APPROOT"
             chown ec2-user:ec2-user "$APPROOT"
 
+            # CloudShirt en DB opzetten
             sudo -u ec2-user bash -lc "
               set -e
               git clone --branch ${RepoBranch} ${RepoUrl} $APPROOT/src
@@ -200,7 +206,7 @@ Resources:
           - |
             #!/bin/bash -xe
             yum update -y
-            yum install -y gcc git unzip curl amazon-linux-extras
+            yum install -y gcc git unzip curl amazon-linux-extras amazon-efs-utils
 
             rpm -Uvh https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
             yum install -y aspnetcore-runtime-6.0 dotnet-sdk-6.0
@@ -209,9 +215,12 @@ Resources:
             systemctl enable nginx
 
             # EFS Mount
-            # mkdir -p /mnt/efs
-            # mount -t nfs4 -o tls ${EFS_ID}:/ /mnt/efs
-            # echo "${EFS_ID}:/ /mnt/efs nfs4 defaults,_netdev 0 0" >> /etc/fstab
+            mkdir -p /mnt/efs/
+            mount -t efs -o tls ${EFS_ID}:/ /mnt/efs
+            echo "${EFS_ID}:/ /mnt/efs efs defaults,_netdev 0 0" >> /etc/fstab
+
+            # Nginx directory maken voor logs
+            mkdir -p /mnt/efs/nginx
 
             # Nginx config
             cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
@@ -230,8 +239,9 @@ Resources:
                     proxy_set_header X-Forwarded-Proto $scheme;
                     proxy_buffering off;
                 }
-                #access_log /mnt/efs/nginx/access.log;
-                #error_log /mnt/efs/nginx/error.log;
+                # Access en error log wegschrijven in EFS
+                access_log /mnt/efs/nginx/access.log;
+                error_log /mnt/efs/nginx/error.log;
             }
             NGINX
 
@@ -240,6 +250,7 @@ Resources:
             mkdir -p "$APPROOT"
             chown ec2-user:ec2-user "$APPROOT"
 
+            # CloudShirt clonen en DB connectie
             sudo -u ec2-user bash -lc "
               set -e
               git clone --branch ${RepoBranch} ${RepoUrl} $APPROOT/src
