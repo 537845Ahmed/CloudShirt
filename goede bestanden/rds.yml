@@ -13,6 +13,7 @@ Parameters:
     Type: String
     NoEcho: true
     Description: Master password for RDS
+    Default: Welkom123!
   DBAllocatedStorage:
     Type: Number
     Default: 30
