@@ -5,7 +5,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow NFS access to CloudShirt EFS
-      VpcId: !ImportValue base-stack:VPCId
+      VpcId: !ImportValue base-stack:VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 2049
@@ -22,10 +22,7 @@ Resources:
       PerformanceMode: generalPurpose
       LifecyclePolicies:
         - TransitionToIA: AFTER_30_DAYS
-      Tags:
-        - Key: Name
-          Value: CloudShirtLogs
-
+        
   CloudShirtEFSMountTarget1:
     Type: AWS::EFS::MountTarget
     Properties:
