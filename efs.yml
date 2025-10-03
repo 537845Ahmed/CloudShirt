@@ -51,3 +51,9 @@ Outputs:
     Value: !Ref CloudShirtEFSSG
     Export:
       Name: !Sub "${AWS::StackName}:EFSSG"
+
+  EFSDNS:
+    Description: Regional DNS name of the EFS filesystem
+    Value: !Sub "${CloudShirtEFS}.efs.${AWS::Region}.amazonaws.com"
+    Export:
+      Name: !Sub "${AWS::StackName}:EFSDNS"
