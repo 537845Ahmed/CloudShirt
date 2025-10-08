@@ -1,0 +1,30 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: S3 bucket voor RDS data
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: Naam van de S3 bucket
+    Default: rds-export-bucket-demo
+
+Resources:
+  RDSExportBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+Outputs:
+  BucketName:
+    Description: Naam van de bucket
+    Value: !Ref RDSExportBucket
+
+  BucketArn:
+    Description: ARN van de bucket
+    Value: !GetAtt RDSExportBucket.Arn
