@@ -66,6 +66,21 @@ Deploy-Stack -StackName "efs-stack" -TemplateFile ".\efs.yml"
 Deploy-Stack -StackName "elk-stack" -TemplateFile ".\elk.yml"
 Deploy-Stack -StackName "rds-stack" -TemplateFile ".\rds.yml"
 
+# RDS data exporteren
+$stackName = "rds-stack"
+$resourceID = "cloudshirt-db"
+
+$rdsPhysicalId = aws cloudformation describe-stack-resource `
+    --stack-name $stackName `
+    --logical-resource-id $resourceID `
+    --region $Region `
+    | ConvertFrom-Json | Select-Object -ExpandProperty StackResourceDetail | Select-Object -ExpandProperty PhysicalResourceId
+
+$rdsInfo = aws rds describe-db-instances --db-instance-identifier $resourceID --region $Region | ConvertFrom-Json
+$rdsEndpoint = $rdsInfo.DBInstances[0].Endpoint.Address
+
+Write-Host "RDS endpoint gevonden: $rdsEndpoint" -ForegroundColor Green
+
 # 3. EC2
 Deploy-Stack -StackName "ec2-stack" -TemplateFile ".\ec2.yml"
 
@@ -74,3 +89,10 @@ Deploy-Stack -StackName "lb-stack" -TemplateFile ".\Loadbalancer.yml"
 
 # 5. Auto Scaling Group
 Deploy-Stack -StackName "asg-stack" -TemplateFile ".\AutoScalingGroup.yml"
+
+# 6. S3 bucket
+Deploy-Stack -StackName "s3-stack" -TemplateFile ".\s3.yml"
+
+# RDS data exporteren naar s3
+# 
+# 
