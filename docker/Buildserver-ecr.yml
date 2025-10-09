@@ -1,0 +1,115 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  CloudShirt Buildserver & ECR (AWS Academy compatible, no IAM).
+  Creates ECR repo + EC2 buildserver (public subnet) that builds and pushes Docker images.
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.medium
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: vockey
+  SSHCidr:
+    Type: String
+    Default: 0.0.0.0/0
+  RepoUrl:
+    Type: String
+    Default: https://github.com/looking4ward/CloudShirt.git
+  RepoBranch:
+    Type: String
+    Default: main
+
+Resources:
+  ## ECR repo
+  CloudShirtECR:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: cloudshirt/web
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+
+  ## Security Group
+  BuildserverSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH and HTTP
+      VpcId: !ImportValue base-stack:VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref SSHCidr
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  ## EC2 Buildserver
+  BuildserverInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0254b2d5c4c472488  # Amazon Linux 2
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SubnetId: !ImportValue base-stack:CloudShirtFirstSubnet
+      SecurityGroupIds:
+        - !Ref BuildserverSG
+      Tags:
+        - Key: Name
+          Value: CloudShirt-Buildserver
+      UserData:
+        Fn::Base64:
+          Fn::Join:
+            - ""
+            - [
+                "#!/bin/bash -xe\n",
+                "yum update -y\n",
+                "yum install -y git docker jq amazon-linux-extras cronie\n",
+                "systemctl enable --now docker\n",
+                "usermod -aG docker ec2-user\n",
+                "\n",
+                "echo '==== CloudShirt Buildserver setup ====' > /home/ec2-user/README.txt\n",
+                "echo 'Run aws configure after SSH login to set credentials.' >> /home/ec2-user/README.txt\n",
+                "\n",
+                "REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)\n",
+                "ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)\n",
+                "ECR_URI=\"$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com\"\n",
+                "\n",
+                "PRIVATE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)\n",
+                "docker swarm init --advertise-addr \"$PRIVATE_IP\" || true\n",
+                "\n",
+                "su - ec2-user -c 'git clone --branch ", { "Ref": "RepoBranch" }, " ", { "Ref": "RepoUrl" }, " ~/cloudshirt'\n",
+                "\n",
+                "cat <<'EOF' > /usr/local/bin/build_and_push.sh\n",
+                "#!/bin/bash\n",
+                "set -euo pipefail\n",
+                "REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)\n",
+                "ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)\n",
+                "ECR_URI=\"$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/cloudshirt/web\"\n",
+                "\n",
+                "cd /home/ec2-user/cloudshirt/CloudShirt.Web || exit 1\n",
+                "GIT_SHA=$(git rev-parse --short HEAD || date +%Y%m%d%H%M)\n",
+                "\n",
+                "docker build -t cloudshirt-web:$GIT_SHA .\n",
+                "docker tag cloudshirt-web:$GIT_SHA $ECR_URI:$GIT_SHA\n",
+                "docker tag cloudshirt-web:$GIT_SHA $ECR_URI:latest\n",
+                "\n",
+                "aws ecr get-login-password --region \"$REGION\" | docker login --username AWS --password-stdin \"$ECR_URI\"\n",
+                "docker push \"$ECR_URI:$GIT_SHA\"\n",
+                "docker push \"$ECR_URI:latest\"\n",
+                "EOF\n",
+                "chmod +x /usr/local/bin/build_and_push.sh\n",
+                "echo '0 2 * * * root /usr/local/bin/build_and_push.sh >> /var/log/build_and_push.log 2>&1' > /etc/cron.d/cloudshirt-build\n",
+                "systemctl enable --now crond\n"
+              ]
+
+Outputs:
+  ECRRepositoryUri:
+    Description: URI of the ECR repo
+    Value: !GetAtt CloudShirtECR.RepositoryUri
+  BuildserverPublicIP:
+    Description: Public IP of Buildserver
+    Value: !GetAtt BuildserverInstance.PublicIp
