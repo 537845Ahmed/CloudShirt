@@ -70,7 +70,7 @@ Deploy-Stack -StackName "rds-stack" -TemplateFile ".\rds.yml"
 Deploy-Stack -StackName "buildserver-stack" -TemplateFile ".\buildserver.yml"
 
 # 4. EC2 docker
-Deploy-Stack -StackName "ec2-stack" -TemplateFile ".\ec2.yml"
+Deploy-Stack -StackName "ec2-stack" -TemplateFile ".\ec2Docker.yml"
 
 # 5. Load Balancer
 # Deploy-Stack -StackName "lb-stack" -TemplateFile ".\Loadbalancer.yml"
