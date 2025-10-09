@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Deploy Amazon RDS SQL Server instance and two Amazon Linux 2 EC2 instances with .NET 6, 
+  nginx reverse proxy, CloudShirt web app, and Filebeat configuration for centralized logging to ELK.
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.small
+    Description: EC2 instance type (t3.small aanbevolen voor .NET)
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair for SSH access
+    Default: vockey
+  RepoUrl:
+    Type: String
+    Default: https://github.com/looking4ward/CloudShirt.git
+    Description: Git repository URL for the CloudShirt solution
+  RepoBranch:
+    Type: String
+    Default: main
+    Description: Branch to checkout
+  SSHCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: CIDR range allowed to SSH into the instances
+
+Resources:
+  ## =========================
+  ## Web Instance 1
+  ## =========================
+  WebInstance1:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0254b2d5c4c472488 # Amazon Linux 2
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SubnetId: !ImportValue base-stack:CloudShirtFirstSubnet
+      SecurityGroupIds:
+        - !ImportValue base-stack:InstanceSG
+      Tags:
+        - Key: Name
+          Value: CloudShirt-Web-1-Docker
+        - Key: Project
+          Value: CloudShirt
+        - Key: Environment
+          Value: dev
+      UserData:
+        Fn::Base64: !Sub |
+            #!/bin/bash -xe
+            yum update -y
+            yum install -y gcc git unzip curl docker 
+
+            curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
+            chmod +x /usr/local/bin/docker-compose
+            docker-compose version
+
+  ## =========================
+  ## Web Instance 2 (identiek)
+  ## =========================
+  WebInstance2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0254b2d5c4c472488
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SubnetId: !ImportValue base-stack:CloudShirtSecondSubnet
+      SecurityGroupIds:
+        - !ImportValue base-stack:InstanceSG
+      Tags:
+        - Key: Name
+          Value: CloudShirt-Web-2-Docker
+        - Key: Project
+          Value: CloudShirt
+        - Key: Environment
+          Value: dev
+      UserData:
+        Fn::Base64: !Sub |
+            #!/bin/bash -xe
+            yum update -y
+            yum install -y gcc git unzip curl docker 
+
+            curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
+            chmod +x /usr/local/bin/docker-compose
+            docker-compose version
+
+Outputs:
+  Instance1Id:
+    Description: EC2 Instance 1 ID
+    Value: !Ref WebInstance1
+    Export:
+      Name: !Sub "${AWS::StackName}:Instance1"
+  
+  Instance2Id:
+    Description: EC2 Instance 2 ID
+    Value: !Ref WebInstance2
+    Export:
+      Name: !Sub "${AWS::StackName}:Instance2"
