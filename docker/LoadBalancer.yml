@@ -1,0 +1,66 @@
+Description: >
+  CloudShirt Application Load Balancer Stack
+  - Load Balancer (LB)
+  - Target group voor EC2-instances
+  - Listener op HTTP (poort 80)
+  - Exporteert DNS-naam als output
+
+Resources:
+  # LoadBalancerSG:
+  #   Type: AWS::EC2::SecurityGroup
+  #   Properties:
+  #     GroupDescription: Security Group for Loadbalancer
+  #     VpcId: !ImportValue base-stack:VPC
+  #     SecurityGroupIngress:
+  #       - IpProtocol: tcp
+  #         FromPort: 80
+  #         ToPort: 80
+  #         CidrIp: 0.0.0.0/0
+  #     SecurityGroupEgress:
+  #       - IpProtocol: -1
+  #         CidrIp: 0.0.0.0/0
+
+  # EC2-instances
+  WebTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !ImportValue base-stack:VPC
+      Protocol: HTTP
+      Port: 80
+      TargetType: instance
+      HealthCheckPath: /
+      Targets:
+        - Id: !ImportValue ec2-stack:Instance1
+        - Id: !ImportValue ec2-stack:Instance2
+
+  # Loadbalancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: cloudshirt-alb
+      Subnets:
+        - !ImportValue base-stack:CloudShirtFirstSubnet
+        - !ImportValue base-stack:CloudShirtSecondSubnet
+      SecurityGroups:
+        - !ImportValue base-stack:InstanceSG
+      Scheme: internet-facing
+      Type: application
+
+  # Listener voor HTTP
+  HTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref WebTargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+# Output
+Outputs:
+  LoadBalancerDNSName:
+    Description: Public URL for CloudShirt
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}:LoadBalancerDNS"
