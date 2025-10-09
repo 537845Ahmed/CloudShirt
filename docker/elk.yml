@@ -1,0 +1,174 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Deploy an ELK (Elastic Stack v8.x) instance on Amazon Linux 2023 for centralized logging.
+  Uses t3.large instance with 20 GB root volume in a public subnet (temporary for testing).
+
+Parameters:
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair for SSH access
+    Default: vockey
+
+Resources:
+  ## =========================
+  ## Security Group
+  ## =========================
+  ELKSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH + ELK traffic
+      VpcId: !ImportValue base-stack:VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0         # tijdelijk voor testen
+        - IpProtocol: tcp
+          FromPort: 9200
+          ToPort: 9200
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 9300
+          ToPort: 9300
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5044
+          ToPort: 5044
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5601
+          ToPort: 5601
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: CloudShirt-ELK-SG
+        - Key: Project
+          Value: CloudShirt
+        - Key: Environment
+          Value: dev
+
+  ## =========================
+  ## ELK EC2 Instance
+  ## =========================
+  ELKInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0b0dcb5067f052a63 # Amazon Linux 2023 (us-east-1)
+      InstanceType: t3.large
+      KeyName: !Ref KeyName
+      SubnetId: !ImportValue base-stack:CloudShirtSecondSubnet
+      SecurityGroupIds:
+        - !Ref ELKSecurityGroup
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 20
+            VolumeType: gp3
+            DeleteOnTermination: true
+      Tags:
+        - Key: Name
+          Value: CloudShirt-ELK
+        - Key: Project
+          Value: CloudShirt
+        - Key: Environment
+          Value: dev
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -e
+
+          echo "🔸 [0/7] Start ELK installatie op Amazon Linux 2023..."
+
+          # Java 11
+          sudo yum install -y java-11-amazon-corretto
+
+          # Elasticsearch repo
+          sudo tee /etc/yum.repos.d/elasticsearch.repo > /dev/null <<EOF
+          [elasticsearch]
+          name=Elasticsearch repository for 8.x packages
+          baseurl=https://artifacts.elastic.co/packages/8.x/yum
+          gpgcheck=1
+          gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+          enabled=1
+          autorefresh=1
+          type=rpm-md
+          EOF
+
+          sudo rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
+          sudo yum clean all
+          sudo yum makecache
+
+          # Elasticsearch installeren
+          sudo yum install -y elasticsearch
+
+          # Directories fixen
+          sudo mkdir -p /var/log/elasticsearch /var/lib/elasticsearch
+          sudo chown -R elasticsearch:elasticsearch /var/log/elasticsearch /var/lib/elasticsearch /etc/elasticsearch
+          sudo chmod 750 /var/log/elasticsearch /var/lib/elasticsearch /etc/elasticsearch
+
+          # elasticsearch.yml
+          sudo tee /etc/elasticsearch/elasticsearch.yml > /dev/null <<EOF
+          cluster.name: elk-cluster
+          node.name: node-1
+          network.host: 0.0.0.0
+          http.port: 9200
+          discovery.type: single-node
+          xpack.security.enabled: false
+          path.logs: /var/log/elasticsearch
+          path.data: /var/lib/elasticsearch
+          EOF
+
+          sudo rm -f /etc/elasticsearch/elasticsearch.keystore
+          sudo -u elasticsearch /usr/share/elasticsearch/bin/elasticsearch-keystore create
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable elasticsearch.service
+          sudo systemctl restart elasticsearch.service
+          sleep 10
+
+          # Logstash
+          sudo yum install -y logstash
+          sudo tee /etc/logstash/conf.d/logstash.conf > /dev/null <<'EOF'
+          input { beats { port => 5044 } }
+          output {
+            elasticsearch {
+              hosts => ["http://localhost:9200"]
+              manage_template => false
+              index => "%{[@metadata][beat]}-%{[@metadata][version]}-%{+YYYY.MM.dd}"
+            }
+          }
+          EOF
+          sudo systemctl daemon-reload
+          sudo systemctl enable logstash.service
+          sudo systemctl start logstash.service
+
+          # Kibana
+          sudo yum install -y kibana
+          sudo sed -i 's|#server.host:.*|server.host: "0.0.0.0"|' /etc/kibana/kibana.yml
+          sudo sed -i 's|#elasticsearch.hosts:.*|elasticsearch.hosts: ["http://localhost:9200"]|' /etc/kibana/kibana.yml
+          sudo systemctl daemon-reload
+          sudo systemctl enable kibana.service
+          sudo systemctl start kibana.service
+
+          sudo yum install -y filebeat
+          sudo filebeat setup --dashboards
+          # curl -X GET "localhost:9200/_cat/indices?v"
+
+
+Outputs:
+  ELKPublicIP:
+    Description: Public IP address of the ELK instance
+    Value: !GetAtt ELKInstance.PublicIp
+    Export:
+      Name: !Sub "${AWS::StackName}:ELKPublicIP"
+
+  ELKSecurityGroupExport:
+    Description: Security Group ID for ELK
+    Value: !Ref ELKSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}:ELKSecurityGroup"

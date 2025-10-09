@@ -1,0 +1,59 @@
+Description: CloudShirt .NET EFS stack
+
+Resources:
+  CloudShirtEFSSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow NFS access to CloudShirt EFS
+      VpcId: !ImportValue base-stack:VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          CidrIp: 10.0.0.0/16
+      Tags:
+        - Key: Name
+          Value: CloudShirtEFS-SG
+
+  CloudShirtEFS:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      Encrypted: true
+      PerformanceMode: generalPurpose
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_30_DAYS
+        
+  CloudShirtEFSMountTarget1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref CloudShirtEFS
+      SubnetId: !ImportValue base-stack:CloudShirtFirstSubnet
+      SecurityGroups:
+        - !Ref CloudShirtEFSSG
+
+  CloudShirtEFSMountTarget2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref CloudShirtEFS
+      SubnetId: !ImportValue base-stack:CloudShirtSecondSubnet
+      SecurityGroups:
+        - !Ref CloudShirtEFSSG
+
+Outputs:
+  EFSId:
+    Description: The CloudShirt EFS filesystem ID
+    Value: !Ref CloudShirtEFS
+    Export:
+      Name: !Sub "${AWS::StackName}:EFSid"
+
+  EFSSG:
+    Description: Security group for CloudShirt EFS
+    Value: !Ref CloudShirtEFSSG
+    Export:
+      Name: !Sub "${AWS::StackName}:EFSSG"
+
+  EFSDNS:
+    Description: Regional DNS name of the EFS filesystem
+    Value: !Sub "${CloudShirtEFS}.efs.${AWS::Region}.amazonaws.com"
+    Export:
+      Name: !Sub "${AWS::StackName}:EFSDNS"

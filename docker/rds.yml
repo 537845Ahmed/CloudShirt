@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Deploy Amazon RDS SQL Server instance and two Amazon Linux 2 EC2 instances with .NET 6, 
+  nginx reverse proxy, and CloudShirt web app configured to use the RDS database.
+
+Parameters:
+  DBUsername:
+    Type: String
+    Default: csadmin
+    NoEcho: true
+    Description: Master username for RDS
+  DBPassword:
+    Type: String
+    NoEcho: true
+    Description: Master password for RDS
+    Default: Welkom123!
+  DBAllocatedStorage:
+    Type: Number
+    Default: 30
+    Description: The size of the database (Gb)
+
+Resources:
+  CloudShirtDBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: CloudShirt RDS subnet group
+      SubnetIds:
+        - !ImportValue base-stack:CloudShirtFirstPrivateSubnet
+        - !ImportValue base-stack:CloudShirtSecondPrivateSubnet
+      Tags:
+        - Key: Name
+          Value: CloudShirt-DBSubnetGroup
+
+  CloudShirtRDSInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: cloudshirt-db
+      Engine: sqlserver-ex
+      DBInstanceClass: db.t3.medium
+      AllocatedStorage: !Ref DBAllocatedStorage
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      LicenseModel: license-included
+      MonitoringInterval: 0
+      VPCSecurityGroups:
+        - !ImportValue base-stack:rdsSG
+      DBSubnetGroupName: !Ref CloudShirtDBSubnetGroup
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 1
+      MultiAZ: false
+      StorageType: gp2
+      DeletionProtection: false
+    DeletionPolicy: Snapshot
+
+Outputs:
+  RDSEndpointAddress:
+    Description: The RDS endpoint address
+    Value: !GetAtt CloudShirtRDSInstance.Endpoint.Address
+    Export:
+      Name: !Sub "${AWS::StackName}:RDSEndpointAddress"
+
+  RDSUsername:
+    Description: The RDS master username
+    Value: !Ref DBUsername
+    Export:
+      Name: !Sub "${AWS::StackName}:RDSUsername"
+
+  RDSPassword:
+    Description: The RDS master password
+    Value: !Ref DBPassword
+    Export:
+      Name: !Sub "${AWS::StackName}:RDSPassword"
