@@ -82,17 +82,6 @@ Resources:
             systemctl enable --now docker
             usermod -aG docker ec2-user || true
 
-            # Helpful readme for manual next steps
-            cat > /home/ec2-user/README.txt <<'README'
-            CloudShirt buildserver (install-only)
-            - Installed: docker, git, jq, cronie
-            - Repo cloned to: /home/ec2-user/cloudshirt (if accessible)
-            - This CFN does NOT configure AWS credentials or automatic push
-            - To push builds: ssh in, run 'aws configure' (or attach an instance role),
-              then run your build & push commands manually.
-            README
-            chown ec2-user:ec2-user /home/ec2-user/README.txt
-
             # Prepare workspace and clone repo as ec2-user
             mkdir -p /home/ec2-user/cloudshirt
             chown ec2-user:ec2-user /home/ec2-user/cloudshirt
@@ -110,3 +99,4 @@ Outputs:
   BuildserverPublicIP:
     Description: Public IP of the Buildserver EC2
     Value: !GetAtt BuildserverInstance.PublicIp
+
