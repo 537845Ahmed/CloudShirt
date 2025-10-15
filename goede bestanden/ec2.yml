@@ -191,12 +191,7 @@ Resources:
             bcp -v
             sqlcmd -? 
 
-            curl -s -O /home/ec2-user/export-rds.sh https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/export-rds.sh
-
-            chmod +x /home/ec2-user/export-rds.sh
-
-            chown ec2-user:ec2-user /home/ec2-user/export-rds.sh
-
+            curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/export-rds.sh
 
           - RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
             DBUsername: !ImportValue rds-stack:RDSUsername
@@ -368,11 +363,7 @@ Resources:
             bcp -v
             sqlcmd -? 
 
-            curl -s -O /home/ec2-user/export-rds.sh https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/export-rds.sh
-
-            chmod +x /home/ec2-user/export-rds.sh
-            
-            chown ec2-user:ec2-user /home/ec2-user/export-rds.sh
+            curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/export-rds.sh
 
           - RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
             DBUsername: !ImportValue rds-stack:RDSUsername
