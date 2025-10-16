@@ -1,11 +1,11 @@
+# docker/docker-compose.tpl.yml
 version: "3.9"
 services:
   web:
-    image: cloudshirt:local       # of later docker.io/<jouwuser>/cloudshirt:latest
+    image: cloudshirt:local
     container_name: cloudshirt-web
     ports: ["80:5000"]
     restart: always
     environment:
       ASPNETCORE_ENVIRONMENT: "Production"
-      # Let op: placeholders — deze worden door de buildserver vervangen met sed:
-      ConnectionStrings__Default: "Server=__RDS_ENDPOINT__;Database=CloudShirt;User Id=__DB_USER__;Password=__DB_PASSWORD__;TrustServerCertificate=true
+      ConnectionStrings__Default: "Server=__RDS_ENDPOINT__;Database=CloudShirt;User Id=__DB_USER__;Password=__DB_PASSWORD__;TrustServerCertificate=true"
