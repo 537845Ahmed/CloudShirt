@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Deploy Amazon Linux 2 EC2 instance with Docker, Docker Compose, fixed private IP, 
+  initialize Docker Swarm, token wordt weggeschreven naar EFS
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.small
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: vockey
+  FixedPrivateIP:
+    Type: String
+    Description: Fixed private IP voor de manager EC2 (bijv. 10.0.1.10)
+    Default: 10.0.1.10
+
+Resources:
+  WebInstance1:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0254b2d5c4c472488
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SubnetId: !ImportValue base-stack:CloudShirtFirstSubnet
+      PrivateIpAddress: !Ref FixedPrivateIP
+      SecurityGroupIds:
+        - !ImportValue base-stack:InstanceSG
+        - !ImportValue efs-stack:EFSSG
+      Tags:
+        - Key: Name
+          Value: CloudShirt-Web-1-DockerSwarmHost
+      UserData:
+        Fn::Base64: !Sub 
+        - |
+          #!/bin/bash -xe
+          yum update -y
+          yum install -y gcc git unzip curl docker jq nfs-utils amazon-efs-utils
+
+          # Docker service starten
+          systemctl enable docker
+          systemctl start docker
+
+          # Docker Compose installeren
+          curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          chmod +x /usr/local/bin/docker-compose
+          /usr/local/bin/docker-compose version
+
+          # EFS mounten
+          mkdir -p /mnt/efs
+          mount -t efs -o tls ${EFS_DNS}:/ /mnt/efs
+          echo "${EFS_DNS}:/ /mnt/efs efs defaults,_netdev 0 0" >> /etc/fstab
+
+          # Docker Swarm init
+          docker swarm init
+
+          # Maak join command en sla op op EFS
+          TOKEN=$(docker swarm join-token worker -q)
+          echo "docker swarm join --token $TOKEN 10.0.1.10:2377" > /mnt/efs/swarm-join-command.txt
+
+        - EFS_DNS: !ImportValue efs-stack:EFSDNS
+
+Outputs:
+  Instance1Id:
+    Description: EC2 Instance 1 ID
+    Value: !Ref WebInstance1
+    Export:
+      Name: !Sub "${AWS::StackName}:Instance1"
+
+  SwarmJoinCommandEFS:
+    Description: "Path to join command on EFS"
+    Value: /mnt/efs/swarm-join-command.txt
+    Export:
+      Name: !Sub "${AWS::StackName}:SwarmJoinCommandEFS"
