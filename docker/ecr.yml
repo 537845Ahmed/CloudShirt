@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Create two Amazon ECR repositories for CloudShirt .NET Docker images:
+  - eshopwebmvc
+  - eshoppublicapi
+
+Resources:
+  ECRWebMVC:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: eshopwebmvc
+      ImageScanningConfiguration:
+        scanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep only the last 10 images",
+                "selection": {
+                  "tagStatus": "tagged",
+                  "tagPrefixList": ["latest"],
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+      Tags:
+        - Key: Project
+          Value: CloudShirt
+        - Key: Environment
+          Value: dev
+
+  ECRPublicAPI:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: eshoppublicapi
+      ImageScanningConfiguration:
+        scanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep only the last 10 images",
+                "selection": {
+                  "tagStatus": "tagged",
+                  "tagPrefixList": ["latest"],
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+      Tags:
+        - Key: Project
+          Value: CloudShirt
+        - Key: Environment
+          Value: dev
+
+Outputs:
+  ECRWebMVCUri:
+    Description: URI of the eshopwebmvc repository
+    Value: !GetAtt ECRWebMVC.RepositoryUri
+    Export:
+      Name: !Sub "${AWS::StackName}-ECRWebMVCUri"
+
+  ECRPublicAPIUri:
+    Description: URI of the eshoppublicapi repository
+    Value: !GetAtt ECRPublicAPI.RepositoryUri
+    Export:
+      Name: !Sub "${AWS::StackName}-ECRPublicAPIUri"
