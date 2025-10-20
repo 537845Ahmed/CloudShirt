@@ -27,6 +27,12 @@ Resources:
       SecurityGroupIds:
         - !ImportValue base-stack:InstanceSG
         - !ImportValue efs-stack:EFSSG
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 20
+            VolumeType: gp3
+            DeleteOnTermination: true 
       Tags:
         - Key: Name
           Value: CloudShirt-Web-1-DockerSwarmHost
