@@ -64,7 +64,18 @@ Resources:
           TOKEN=$(docker swarm join-token worker -q)
           echo "docker swarm join --token $TOKEN 10.0.1.10:2377" > /mnt/efs/swarm-join-command.txt
 
+          echo "${RDSENDPOINT}" > /mnt/efs/rds-endpoint.txt
+
+          # Wacht eventueel tot appsettings.json beschikbaar is
+          while [ ! -f /mnt/efs/appsettings.json ]; do
+              sleep 1
+          done
+
+          RDS=$(cat /mnt/efs/rds-endpoint.txt)
+          sed -i "s|<RDS-ENDPOINT>|$RDS|g" <ZET HIER CORRECTE PAD NEER> 
+
         - EFS_DNS: !ImportValue efs-stack:EFSDNS
+          RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
 
 Outputs:
   Instance1Id:
