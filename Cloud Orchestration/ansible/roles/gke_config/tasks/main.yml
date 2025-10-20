@@ -1,1 +1,40 @@
+---
+- name: Ensure Kubernetes namespace exists
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig_path }}"
+    api_version: v1
+    kind: Namespace
+    name: cloudshirt
+
+- name: Create DB credentials secret
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig_path }}"
+    namespace: cloudshirt
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: db-secret
+      type: Opaque
+      data:
+        db-username: "{{ 'admin' | b64encode }}"
+        db-password: "{{ db_password | b64encode }}"
+
+- name: Apply CloudShirt Deployment (5 replicas)
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig_path }}"
+    namespace: cloudshirt
+    template: templates/deployment.yml.j2
+
+- name: Apply CloudShirt Service
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig_path }}"
+    namespace: cloudshirt
+    template: templates/service.yml.j2
+
+- name: Apply Ingress for external access
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig_path }}"
+    namespace: cloudshirt
+    template: templates/ingress.yml.j2
 
