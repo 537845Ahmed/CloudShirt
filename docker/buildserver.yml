@@ -75,6 +75,9 @@ Resources:
           # RDS=$(cat /mnt/efs/rds-endpoint.txt)
           # sed -i "s|<RDS-ENDPOINT>|$RDS|g" <ZET HIER CORRECTE PAD NEER> 
 
+          # cd "/home/ec2-user/CloudShirt-1"
+          # echo "Current directory: $(pwd)"
+          
           # BASH SCRIPT VOOR ENDPOINT
           # chmod +x endpointsetter
           # endpointsetter.sh 
@@ -83,9 +86,9 @@ Resources:
           # chmod +x build-images.sh
           # build-images.sh
           
-          # BASH SCRIPT OM CLUSTER MAKEN
-          # docker-compose
-          # script
+          # DOCKER SWARM DEPLOYEN
+          # docker stack deploy -c docker-compose-deploy.yml Cloudshirt-Stack
+
           
         - EFS_DNS: !ImportValue efs-stack:EFSDNS
           RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
