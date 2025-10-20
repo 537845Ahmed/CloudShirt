@@ -74,6 +74,15 @@ Resources:
           RDS=$(cat /mnt/efs/rds-endpoint.txt)
           sed -i "s|<RDS-ENDPOINT>|$RDS|g" <ZET HIER CORRECTE PAD NEER> 
 
+          # BASH SCRIPT VOOR IMAGE MAKEN
+          # docker build -t web -f src/Web/Dockerfile . // WEB
+          # docker build -t publicapi -f src/PublicApi/Dockerfile . // API
+          # images naar ECR
+          
+          # BASH SCRIPT OM CLUSTER MAKEN
+          # docker-compose
+          # script
+          
         - EFS_DNS: !ImportValue efs-stack:EFSDNS
           RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
 
