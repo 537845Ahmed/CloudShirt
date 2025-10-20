@@ -1,5 +1,5 @@
 resource "aws_cloudformation_stack" "elk" {
-  name          = "cloudshirt-elk"
+  name          = "elk-stack"
   template_body = file("${path.root}/templates/elk.yml")
 
   tags = {
