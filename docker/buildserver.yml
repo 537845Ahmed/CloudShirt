@@ -74,11 +74,13 @@ Resources:
           # endpoint twee manieren
           # RDS=$(cat /mnt/efs/rds-endpoint.txt)
           # sed -i "s|<RDS-ENDPOINT>|$RDS|g" <ZET HIER CORRECTE PAD NEER> 
-          
+
+          # BASH SCRIPT VOOR ENDPOINT
           # chmod +x endpointsetter
           # endpointsetter.sh 
 
           # BASH SCRIPT VOOR IMAGE MAKEN
+          # chmod +x build-images.sh
           # build-images.sh
           
           # BASH SCRIPT OM CLUSTER MAKEN
