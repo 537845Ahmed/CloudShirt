@@ -1,5 +1,5 @@
 resource "aws_cloudformation_stack" "base" {
-  name          = "cloudshirt-base"
+  name          = "base-stack"
   template_body = file("${path.root}/templates/base_file.yml")
 
   tags = {
