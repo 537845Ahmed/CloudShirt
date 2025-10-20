@@ -1,1 +1,4 @@
+artifact_repo: "europe-west4-docker.pkg.dev/cloudshirt-project/cloudshirt-repo/cloudshirt:latest"
+db_password: "Welkom123!"
+replica_count: 5
 
