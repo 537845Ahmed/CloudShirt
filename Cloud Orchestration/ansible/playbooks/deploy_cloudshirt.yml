@@ -1,1 +1,10 @@
+---
+- name: Configure and deploy CloudShirt on GKE
+  hosts: local
+  gather_facts: no
 
+  vars:
+    kubeconfig_path: "~/.kube/config"
+
+  roles:
+    - role: ../roles/gke_config
