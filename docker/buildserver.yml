@@ -74,12 +74,8 @@ Resources:
           cd "/home/ec2-user/CloudShirt-1"
           echo "Current directory: $(pwd)"
           
-          # endpoint twee manieren
-          # RDS=$(cat /mnt/efs/rds-endpoint.txt)
-          # sed -i "s|<RDS-ENDPOINT>|$RDS|g" <ZET HIER CORRECTE PAD NEER> 
-          
           # BASH SCRIPT VOOR ENDPOINT
-          chmod +x endpointsetter
+          chmod +x endpointsetter.sh
           endpointsetter.sh 
 
           # BASH SCRIPT VOOR IMAGE MAKEN
@@ -87,7 +83,11 @@ Resources:
           build-push-images.sh
           
           # DOCKER SWARM DEPLOYEN
-          # docker stack deploy -c docker-compose-deploy.yml Cloudshirt-Stack
+          docker stack deploy -c docker-compose-deploy.yml Cloudshirt-Stack
+
+          # endpoint twee manieren
+          # RDS=$(cat /mnt/efs/rds-endpoint.txt)
+          # sed -i "s|<RDS-ENDPOINT>|$RDS|g" <ZET HIER CORRECTE PAD NEER> 
 
           
         - EFS_DNS: !ImportValue efs-stack:EFSDNS
@@ -105,3 +105,4 @@ Outputs:
     Value: /mnt/efs/swarm-join-command.txt
     Export:
       Name: !Sub "${AWS::StackName}:SwarmJoinCommandEFS"
+      
