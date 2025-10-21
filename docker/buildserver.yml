@@ -93,6 +93,16 @@ Resources:
           chmod +x endpointsetter.sh
           ./endpointsetter.sh 
 
+          # Repositories aanmaken
+          for repo in eshoppublicapi eshopwebmvc; do
+            if ! aws ecr describe-repositories --repository-names $repo --region us-east-1 >/dev/null 2>&1; then
+              echo "Repository $repo bestaat nog niet — wordt aangemaakt..."
+              aws ecr create-repository --repository-name $repo --region us-east-1
+            else
+              echo "Repository $repo bestaat al."
+            fi
+          done
+
           # BASH SCRIPT VOOR IMAGE MAKEN
           chmod +x build-push-images.sh
           ./build-push-images.sh
