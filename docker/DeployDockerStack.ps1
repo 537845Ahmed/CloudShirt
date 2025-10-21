@@ -3,37 +3,54 @@ param(
     [string]$Region = "us-east-1"
 )
 
-# Check of AWS CLI credentials beschikbaar zijn
-$awsIdentity = aws sts get-caller-identity --region $Region 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Voordat je begint met dit script, moet AWS geconfigureerd zijn!`nAWS configure" -ForegroundColor Yellow
+# ===== Controleer of AWS CLI aanwezig is =====
+if (-not (Get-Command aws -ErrorAction SilentlyContinue)) {
+    Write-Host "AWS CLI is niet geïnstalleerd. Installeer eerst AWS CLI v2." -ForegroundColor Red
     exit 1
 }
 
-Write-Host "AWS CLI is geconfigureerd, verder met deployment" -ForegroundColor Green
+Write-Host "AWS CLI gevonden, verder met deployment" -ForegroundColor Green
 
 # ===== Vraag tijdelijke AWS credentials =====
 Write-Host "`nVoer je tijdelijke AWS-credentials in (zoals uit AWS Academy 'Show AWS CLI Credentials')" -ForegroundColor Cyan
 
-$AccessKey = Read-Host "AWS_ACCESS_KEY_ID"
-$SecretKey = Read-Host "AWS_SECRET_ACCESS_KEY"
+$AccessKey    = Read-Host "AWS_ACCESS_KEY_ID"
+$SecretKey    = Read-Host "AWS_SECRET_ACCESS_KEY"
 $SessionToken = Read-Host "AWS_SESSION_TOKEN"
 
-#vraag ook naar je AWS account ID
-$AccountId = Read-Host "AWS Account ID"
-
-# Exporteer ze voor deze sessie (zodat aws cli ook werkt)
-$env:AWS_ACCESS_KEY_ID = $AccessKey
+# ===== Stel de omgeving in =====
+$env:AWS_ACCESS_KEY_ID     = $AccessKey
 $env:AWS_SECRET_ACCESS_KEY = $SecretKey
-$env:AWS_SESSION_TOKEN = $SessionToken
-$env:AWS_ACCOUNT_ID = $AccountId
+$env:AWS_SESSION_TOKEN     = $SessionToken
+$env:AWS_DEFAULT_REGION    = $Region
 
-# ===== Functie om stack te deployen (update of create) =====
+# Controleer of credentials geldig zijn
+$caller = aws sts get-caller-identity 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "`nFout: de ingevoerde credentials zijn ongeldig of verlopen." -ForegroundColor Red
+    exit 1
+}
+
+# ===== Haal automatisch AWS Account ID op =====
+$AccountId = (aws sts get-caller-identity --query "Account" --output text 2>$null)
+
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($AccountId) -or $AccountId -eq "null") {
+  Write-Host "Kon AWS Account ID niet automatisch ophalen." -ForegroundColor Yellow
+  $AccountId = Read-Host "Voer AWS Account ID handmatig in (bijv. 730335381450)"
+  if ([string]::IsNullOrWhiteSpace($AccountId)) {
+    Write-Host "Geen Account ID opgegeven. Stop." -ForegroundColor Red
+    exit 1
+  }
+} else {
+  Write-Host "AWS Account ID automatisch gevonden: $AccountId" -ForegroundColor Green
+}
+
+# ===== Functie om stack te deployen =====
 function Deploy-Stack {
     param (
         [string]$StackName,
         [string]$TemplateFile,
-        [switch]$IncludeCredentials # Nieuw!
+        [switch]$IncludeCredentials
     )
 
     Write-Host ">>> Deploying stack: $StackName ($TemplateFile)" -ForegroundColor Cyan
@@ -41,7 +58,7 @@ function Deploy-Stack {
     # Controleer of stack al bestaat
     $exists = aws cloudformation describe-stacks --region $Region --stack-name $StackName 2>$null
 
-    # Als de stack credentials moet ontvangen
+    # Parameters indien nodig
     if ($IncludeCredentials) {
         $Params = @(
             "ParameterKey=AccessKey,ParameterValue=$AccessKey",
@@ -88,13 +105,13 @@ function Deploy-Stack {
 }
 
 # ===== Deployment volgorde =====
-Deploy-Stack -StackName "base-stack" -TemplateFile ".\base_file.yml"
-Deploy-Stack -StackName "efs-stack" -TemplateFile ".\efs.yml"
-Deploy-Stack -StackName "elk-stack" -TemplateFile ".\elk.yml"
-Deploy-Stack -StackName "rds-stack" -TemplateFile ".\rds.yml"
+Deploy-Stack -StackName "base-stack"        -TemplateFile ".\docker-base_file.yml"
+Deploy-Stack -StackName "efs-stack"         -TemplateFile ".\efs.yml"
+Deploy-Stack -StackName "elk-stack"         -TemplateFile ".\elk.yml"
+Deploy-Stack -StackName "rds-stack"         -TemplateFile ".\rds.yml"
 
-# Deze twee stacks gebruiken de tijdelijke credentials in hun UserData:
+# Stacks die credentials gebruiken
 Deploy-Stack -StackName "buildserver-stack" -TemplateFile ".\buildserver.yml" -IncludeCredentials
-Deploy-Stack -StackName "ec2-stack" -TemplateFile ".\ec2Docker.yml" -IncludeCredentials
+Deploy-Stack -StackName "ec2-stack"         -TemplateFile ".\ec2Docker.yml"   -IncludeCredentials
 
-Deploy-Stack -StackName "s3-stack" -TemplateFile ".\s3.yml"
+Deploy-Stack -StackName "s3-stack"          -TemplateFile ".\s3.yml"
