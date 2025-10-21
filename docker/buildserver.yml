@@ -76,11 +76,11 @@ Resources:
           
           # BASH SCRIPT VOOR ENDPOINT
           chmod +x endpointsetter.sh
-          endpointsetter.sh 
+          ./endpointsetter.sh 
 
           # BASH SCRIPT VOOR IMAGE MAKEN
           chmod +x build-push-images.sh
-          build-push-images.sh
+          ./build-push-images.sh
           
           # DOCKER SWARM DEPLOYEN
           docker stack deploy -c docker-compose-deploy.yml Cloudshirt-Stack
