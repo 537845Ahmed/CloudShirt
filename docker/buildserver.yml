@@ -66,10 +66,13 @@ Resources:
 
           echo "${RDSENDPOINT}" > /mnt/efs/rds-endpoint
 
-          cd "/home/ec2-user/CloudShirt-1"
+          cd "/home/ec2-user"
           echo "Current directory: $(pwd)"
 
-          git clone https://github.com/537845Ahmed/CloudShirt.git
+          git clone https://github.com/537845Ahmed/CloudShirt-1.git
+
+          cd "/home/ec2-user/CloudShirt-1"
+          echo "Current directory: $(pwd)"
           
           # endpoint twee manieren
           # RDS=$(cat /mnt/efs/rds-endpoint.txt)
