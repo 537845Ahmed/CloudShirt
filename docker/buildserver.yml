@@ -84,7 +84,7 @@ Resources:
           ./build-push-images.sh
           
           # DOCKER SWARM DEPLOYEN
-          docker stack deploy -c docker-compose-deploy.yml Cloudshirt-Stack
+          docker stack deploy -c docker-stack.yml Cloudshirt-Stack
 
           # endpoint twee manieren
           # RDS=$(cat /mnt/efs/rds-endpoint.txt)
