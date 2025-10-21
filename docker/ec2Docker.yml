@@ -72,6 +72,13 @@ Resources:
             SWARM_CMD=$(cat /mnt/efs/swarm-join-command.txt)
             eval $SWARM_CMD
 
+            cd "/home/ec2-user"
+            echo "Current directory: $(pwd)"
+
+            curl -o download-image.sh https://raw.githubusercontent.com/537845Ahmed/CloudShirt-1/main/download-image.sh
+            chmod +x download-image.sh
+            ./download-image.sh
+            
         - EFS_DNS: !ImportValue efs-stack:EFSDNS
 
   ## =========================
