@@ -258,6 +258,14 @@ Resources:
           FromPort: 7946
           ToPort: 7946
           CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5098
+          ToPort: 5098
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5106
+          ToPort: 5106
+          CidrIp: 0.0.0.0/0
         - IpProtocol: udp
           FromPort: 7946
           ToPort: 7946
