@@ -4,6 +4,12 @@ Description: >
   initialize Docker Swarm, token wordt weggeschreven naar EFS
 
 Parameters:
+  AccessKey:
+    Type: String
+  SecretKey:
+    Type: String
+  SessionToken:
+    Type: String
   InstanceType:
     Type: String
     Default: t3.small
@@ -40,6 +46,10 @@ Resources:
         Fn::Base64: !Sub 
         - |
           #!/bin/bash -xe
+          export AWS_ACCESS_KEY_ID=${AccessKey}
+          export AWS_SECRET_ACCESS_KEY=${SecretKey}
+          export AWS_SESSION_TOKEN=${SessionToken}
+          export AWS_DEFAULT_REGION=us-east-1
           yum update -y
           yum install -y gcc git unzip curl docker jq nfs-utils amazon-efs-utils
 
