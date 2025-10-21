@@ -19,10 +19,14 @@ $AccessKey = Read-Host "AWS_ACCESS_KEY_ID"
 $SecretKey = Read-Host "AWS_SECRET_ACCESS_KEY"
 $SessionToken = Read-Host "AWS_SESSION_TOKEN"
 
+#vraag ook naar je AWS account ID
+$AccountId = Read-Host "AWS Account ID"
+
 # Exporteer ze voor deze sessie (zodat aws cli ook werkt)
 $env:AWS_ACCESS_KEY_ID = $AccessKey
 $env:AWS_SECRET_ACCESS_KEY = $SecretKey
 $env:AWS_SESSION_TOKEN = $SessionToken
+$env:AWS_ACCOUNT_ID = $AccountId
 
 # ===== Functie om stack te deployen (update of create) =====
 function Deploy-Stack {
@@ -42,7 +46,8 @@ function Deploy-Stack {
         $Params = @(
             "ParameterKey=AccessKey,ParameterValue=$AccessKey",
             "ParameterKey=SecretKey,ParameterValue=$SecretKey",
-            "ParameterKey=SessionToken,ParameterValue=$SessionToken"
+            "ParameterKey=SessionToken,ParameterValue=$SessionToken",
+            "ParameterKey=AccountId,ParameterValue=$AccountId"
         )
     } else {
         $Params = @()
