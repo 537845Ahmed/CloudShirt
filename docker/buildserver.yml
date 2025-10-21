@@ -66,20 +66,22 @@ Resources:
 
           echo "${RDSENDPOINT}" > /mnt/efs/rds-endpoint
 
+          cd "/home/ec2-user/CloudShirt-1"
+          echo "Current directory: $(pwd)"
+
+          git clone https://github.com/537845Ahmed/CloudShirt.git
+          
           # endpoint twee manieren
           # RDS=$(cat /mnt/efs/rds-endpoint.txt)
           # sed -i "s|<RDS-ENDPOINT>|$RDS|g" <ZET HIER CORRECTE PAD NEER> 
-
-          # cd "/home/ec2-user/CloudShirt-1"
-          # echo "Current directory: $(pwd)"
           
           # BASH SCRIPT VOOR ENDPOINT
-          # chmod +x endpointsetter
-          # endpointsetter.sh 
+          chmod +x endpointsetter
+          endpointsetter.sh 
 
           # BASH SCRIPT VOOR IMAGE MAKEN
-          # chmod +x build-images.sh
-          # build-images.sh
+          chmod +x build-push-images.sh
+          build-push-images.sh
           
           # DOCKER SWARM DEPLOYEN
           # docker stack deploy -c docker-compose-deploy.yml Cloudshirt-Stack
