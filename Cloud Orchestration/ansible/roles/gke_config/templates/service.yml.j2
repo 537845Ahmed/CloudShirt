@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ item.name }}-svc
+  namespace: {{ namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ item.name }}
+  ports:
+    - port: {{ item.port }}
+      targetPort: {{ item.port }}
