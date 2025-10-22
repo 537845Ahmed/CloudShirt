@@ -1,0 +1,113 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Deploy Amazon RDS SQL Server instance and two Amazon Linux 2 EC2 instances with .NET 6, 
+  nginx reverse proxy, CloudShirt web app, and Filebeat configuration for centralized logging to ELK.
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.small
+    Description: EC2 instance type (t3.small aanbevolen voor .NET)
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair for SSH access
+    Default: vockey
+  AccessKey:
+    Type: String
+  SecretKey:
+    Type: String
+  SessionToken:
+    Type: String
+  AccountId:
+    Type: String  
+Resources:
+  ## =========================
+  ## Launch Template voor ASG
+  ## =========================
+  CloudShirtLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: CloudShirtLT
+      LaunchTemplateData:
+        ImageId: ami-0254b2d5c4c472488
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds:
+          - !ImportValue base-stack:InstanceSG
+        UserData: 
+          Fn::Base64: !Sub 
+          - |
+            #!/bin/bash -xe
+            export AWS_ACCESS_KEY_ID=${AccessKey}
+            export AWS_SECRET_ACCESS_KEY=${SecretKey}
+            export AWS_SESSION_TOKEN=${SessionToken}
+            export AWS_DEFAULT_REGION=us-east-1
+            export AWS_ACCOUNT_ID=${AccountId}
+            
+            yum update -y
+            yum install -y gcc git unzip curl docker amazon-efs-utils
+
+            systemctl enable docker
+            systemctl start docker
+            
+            curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
+            chmod +x /usr/local/bin/docker-compose
+            docker-compose version
+            usermod -aG docker ec2-user
+
+            # EFS mounten
+            mkdir -p /mnt/efs
+            mount -t efs -o tls ${EFS_DNS}:/ /mnt/efs
+            echo "${EFS_DNS}:/ /mnt/efs efs defaults,_netdev 0 0" >> /etc/fstab
+
+            while [ ! -f /mnt/efs/swarm-join-command.txt ]; do
+              sleep 5
+            done
+
+            SWARM_CMD=$(cat /mnt/efs/swarm-join-command.txt)
+            eval $SWARM_CMD
+
+            cd "/home/ec2-user"
+            echo "Current directory: $(pwd)"
+
+            curl -o download-image.sh https://raw.githubusercontent.com/537845Ahmed/CloudShirt-1/main/download-image.sh
+            chmod +x download-image.sh
+            ./download-image.sh
+          - EFS_DNS: !ImportValue efs-stack:EFSDNS
+
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Project
+                Value: CloudShirt
+              - Key: Environment
+                Value: dev
+
+  ## =========================
+  ## Auto Scaling Group
+  ## =========================
+  CloudShirtASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref CloudShirtLaunchTemplate
+        Version: !GetAtt CloudShirtLaunchTemplate.LatestVersionNumber
+      MinSize: 2
+      MaxSize: 3
+      DesiredCapacity: 2
+      VPCZoneIdentifier:
+        - !ImportValue base-stack:CloudShirtFirstSubnet
+        - !ImportValue base-stack:CloudShirtSecondSubnet
+      TargetGroupARNs:
+        - !ImportValue CloudShirtTG5106-ARN
+        - !ImportValue CloudShirtTG5098-ARN
+      Tags:
+        - Key: Name
+          Value: CloudShirt-Web
+          PropagateAtLaunch: true
+        - Key: Project
+          Value: CloudShirt
+          PropagateAtLaunch: true
+        - Key: Environment
+          Value: dev
+          PropagateAtLaunch: true
