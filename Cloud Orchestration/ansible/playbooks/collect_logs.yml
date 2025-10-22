@@ -1,0 +1,10 @@
+---
+- name: Collect CloudShirt logs from GKE and AWS
+  hosts: local
+  gather_facts: no
+
+  vars:
+    kubeconfig_path: "~/.kube/config"
+
+  roles:
+    - role: ../roles/log_collection
