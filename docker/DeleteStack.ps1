@@ -2,8 +2,8 @@
 param(
     [string]$Region = "us-east-1",
     [string[]]$StacksToDelete = @(
-        "s3-stack",
-        "ec2-stack",
+        "asg-stack",
+        "alb-stack",
         "buildserver-stack",
         "rds-stack",
         "efs-stack",
