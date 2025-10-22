@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Application Load Balancer for CloudShirt ASG instances
+
+Resources:
+  ## =========================
+  ## Application Load Balancer
+  ## =========================
+  CloudShirtALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: CloudShirtALB
+      Subnets:
+        - !ImportValue base-stack:CloudShirtFirstSubnet
+        - !ImportValue base-stack:CloudShirtSecondSubnet
+      SecurityGroups:
+        - !ImportValue base-stack:InstanceSG
+      Scheme: internet-facing
+      Type: application
+
+  ## =========================
+  ## Target Group voor poort 5106
+  ## =========================
+  CloudShirtTG5106:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: CloudShirtTG5106
+      Port: 5106
+      Protocol: HTTP
+      VpcId: !ImportValue base-stack:VPC
+      TargetType: instance
+      HealthCheckPath: /
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 2
+
+  ## =========================
+  ## Target Group voor poort 5098
+  ## =========================
+  CloudShirtTG5098:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: CloudShirtTG5098
+      Port: 5098
+      Protocol: HTTP
+      VpcId: !ImportValue base-stack:VPC
+      TargetType: instance
+      HealthCheckPath: /
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 2
+
+  ## =========================
+  ## Listener voor poort 5106
+  ## =========================
+  CloudShirtListener5106:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref CloudShirtALB
+      Port: 5106
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref CloudShirtTG5106
+
+  ## =========================
+  ## Listener voor poort 5098
+  ## =========================
+  CloudShirtListener5098:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref CloudShirtALB
+      Port: 5098
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref CloudShirtTG5098
+
+Outputs:
+  LoadBalancerDNS:
+    Description: DNS name of the ALB
+    Value: !GetAtt CloudShirtALB.DNSName
+    Export:
+      Name: CloudShirtALB-DNS
+
+  TargetGroup5106ARN:
+    Description: ARN of the Target Group for port 5106
+    Value: !Ref CloudShirtTG5106
+    Export:
+      Name: CloudShirtTG5106-ARN
+
+  TargetGroup5098ARN:
+    Description: ARN of the Target Group for port 5098
+    Value: !Ref CloudShirtTG5098
+    Export:
+      Name: CloudShirtTG5098-ARN
