@@ -1,0 +1,133 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Deploy Amazon Linux 2 EC2 instance with Docker, Docker Compose, fixed private IP, 
+  initialize Docker Swarm, token wordt weggeschreven naar EFS
+
+Parameters:
+  AccessKey:
+    Type: String
+  SecretKey:
+    Type: String
+  SessionToken:
+    Type: String
+  AccountId:
+    Type: String
+  InstanceType:
+    Type: String
+    Default: t3.small
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: vockey
+  FixedPrivateIP:
+    Type: String
+    Description: Fixed private IP voor de manager EC2 (bijv. 10.0.1.10)
+    Default: 10.0.1.10
+
+Resources:
+  WebInstance1:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0254b2d5c4c472488
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SubnetId: !ImportValue base-stack:CloudShirtFirstSubnet
+      PrivateIpAddress: !Ref FixedPrivateIP
+      SecurityGroupIds:
+        - !ImportValue base-stack:InstanceSG
+        - !ImportValue efs-stack:EFSSG
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 20
+            VolumeType: gp3
+            DeleteOnTermination: true 
+      Tags:
+        - Key: Name
+          Value: CloudShirt-Web-1-DockerSwarmHost
+      UserData:
+        Fn::Base64: !Sub 
+        - |
+          #!/bin/bash -xe
+          export AWS_ACCESS_KEY_ID=${AccessKey}
+          export AWS_SECRET_ACCESS_KEY=${SecretKey}
+          export AWS_SESSION_TOKEN=${SessionToken}
+          export AWS_DEFAULT_REGION=us-east-1
+          export AWS_ACCOUNT_ID=${AccountId}
+          
+          yum update -y
+          yum install -y gcc git unzip curl docker jq nfs-utils amazon-efs-utils
+
+          # Docker service starten
+          systemctl enable docker
+          systemctl start docker
+
+          # Docker Compose installeren
+          curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          chmod +x /usr/local/bin/docker-compose
+          /usr/local/bin/docker-compose version
+          usermod -aG docker ec2-user
+
+          # EFS mounten
+          mkdir -p /mnt/efs
+          mount -t efs -o tls ${EFS_DNS}:/ /mnt/efs
+          echo "${EFS_DNS}:/ /mnt/efs efs defaults,_netdev 0 0" >> /etc/fstab
+
+          # Docker Swarm init
+          docker swarm init
+
+          # Maak join command en sla op op EFS
+          TOKEN=$(docker swarm join-token worker -q)
+          echo "docker swarm join --token $TOKEN 10.0.1.10:2377" > /mnt/efs/swarm-join-command.txt
+
+          echo "${RDSENDPOINT}" > /mnt/efs/rds-endpoint
+
+          cd "/home/ec2-user"
+          echo "Current directory: $(pwd)"
+
+          git clone https://github.com/537845Ahmed/CloudShirt-1.git
+
+          cd "/home/ec2-user/CloudShirt-1"
+          echo "Current directory: $(pwd)"
+          
+          # BASH SCRIPT VOOR ENDPOINT
+          chmod +x endpointsetter.sh
+          ./endpointsetter.sh 
+
+          # Repositories aanmaken
+          for repo in eshoppublicapi eshopwebmvc; do
+            if ! aws ecr describe-repositories --repository-names $repo --region us-east-1 >/dev/null 2>&1; then
+              echo "Repository $repo bestaat nog niet — wordt aangemaakt..."
+              aws ecr create-repository --repository-name $repo --region us-east-1
+            else
+              echo "Repository $repo bestaat al."
+            fi
+          done
+
+          # BASH SCRIPT VOOR IMAGE MAKEN
+          chmod +x build-push-images.sh
+          ./build-push-images.sh
+          
+          # DOCKER SWARM DEPLOYEN
+          docker stack deploy -c docker-stack.yml Cloudshirt-Stack
+
+          # endpoint twee manieren
+          # RDS=$(cat /mnt/efs/rds-endpoint.txt)
+          # sed -i "s|<RDS-ENDPOINT>|$RDS|g" <ZET HIER CORRECTE PAD NEER> 
+
+          
+        - EFS_DNS: !ImportValue efs-stack:EFSDNS
+          RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
+
+Outputs:
+  Instance1Id:
+    Description: EC2 Instance 1 ID
+    Value: !Ref WebInstance1
+    Export:
+      Name: !Sub "${AWS::StackName}:Instance1"
+
+  SwarmJoinCommandEFS:
+    Description: "Path to join command on EFS"
+    Value: /mnt/efs/swarm-join-command.txt
+    Export:
+      Name: !Sub "${AWS::StackName}:SwarmJoinCommandEFS"
+      
