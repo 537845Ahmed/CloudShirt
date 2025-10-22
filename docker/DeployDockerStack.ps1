@@ -12,11 +12,42 @@ if (-not (Get-Command aws -ErrorAction SilentlyContinue)) {
 Write-Host "AWS CLI gevonden, verder met deployment" -ForegroundColor Green
 
 # ===== Vraag tijdelijke AWS credentials =====
-Write-Host "`nVoer je tijdelijke AWS-credentials in (zoals uit AWS Academy 'Show AWS CLI Credentials')" -ForegroundColor Cyan
+$awsFile = ".\aws.txt"
 
-$AccessKey    = Read-Host "AWS_ACCESS_KEY_ID"
-$SecretKey    = Read-Host "AWS_SECRET_ACCESS_KEY"
-$SessionToken = Read-Host "AWS_SESSION_TOKEN"
+# Als bestand er niet is, error
+if (-Not (Test-Path $awsFile)) {
+    Write-Host "Fout: aws.txt niet gevonden in de huidige map. Maak een bestand met deze inhoud:" -ForegroundColor Red
+    Write-Host "aws_access_key_id=WAARDE" -ForegroundColor Yellow
+    Write-Host "aws_secret_access_key=WAARDE" -ForegroundColor Yellow
+    Write-Host "aws_session_token=WAARDE" -ForegroundColor Yellow
+    exit 1
+} 
+
+Write-Host "aws.txt gevonden credentials worden ingelezen" -ForegroundColor Green
+
+# Data inladen uit bestand
+$awsData = @{}
+Get-Content $awsFile | ForEach-Object {
+    if ($_ -match '^\s*([^=]+)\s*=\s*(.+)\s*$') {
+        $key = $matches[1].Trim()
+        $value = $matches[2].Trim()
+        $awsData[$key] = $value
+    }
+}
+
+# Data opzoeken
+foreach ($k in @('aws_access_key_id','aws_secret_access_key','aws_session_token')) {
+    if (-not $awsData.ContainsKey($k)) {
+        Write-Host "Fout: sleutel '$k' ontbreekt in aws.txt" -ForegroundColor Red
+        exit 1
+    }
+}
+
+# Data in variabele zetten
+$AccessKey    = $awsData['aws_access_key_id']
+$SecretKey    = $awsData['aws_secret_access_key']
+$SessionToken = $awsData['aws_session_token']
+
 
 # ===== Stel de omgeving in =====
 $env:AWS_ACCESS_KEY_ID     = $AccessKey
@@ -112,6 +143,8 @@ Deploy-Stack -StackName "rds-stack"         -TemplateFile ".\rds.yml"
 
 # Stacks die credentials gebruiken
 Deploy-Stack -StackName "buildserver-stack" -TemplateFile ".\buildserver.yml" -IncludeCredentials
-Deploy-Stack -StackName "ec2-stack"         -TemplateFile ".\ec2Docker.yml"   -IncludeCredentials
+Deploy-Stack -StackName "alb-stack"         -TemplateFile ".\docker-loadbalancer.yml"
+Deploy-Stack -StackName "asg-stack"         -TemplateFile ".\dockerasg.yml"   -IncludeCredentials
+# Deploy-Stack -StackName "ec2-stack"         -TemplateFile ".\ec2Docker.yml"   -IncludeCredentials
 
-Deploy-Stack -StackName "s3-stack"          -TemplateFile ".\s3.yml"
+# Deploy-Stack -StackName "s3-stack"          -TemplateFile ".\s3.yml"
