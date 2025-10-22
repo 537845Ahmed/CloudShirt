@@ -7,7 +7,7 @@ module "base" {
 }
 
 module "rds" {
-  source      = "./modules/aws/rds_stack"
+  source      = "./modules/aws/rds-stack"
   db_password = var.db_password
   depends_on  = [module.base]
 }
@@ -19,7 +19,12 @@ module "efs" {
 
 module "elk" {
   source     = "./modules/aws/elk_stack"
-  depends_on = [module.buildserver]
+  depends_on = [module.base]
+}
+
+module "buildserver" {
+  source     = "./modules/aws/buildserver_stack"
+  depends_on = [module.rds]
 }
 
 
@@ -38,6 +43,8 @@ module "artifact_registry" {
 
 module "gke_cluster" {
   source     = "./modules/gcp/gke_cluster"
+  vpc_id     = module.network.vpc_id
+  subnet_id  = module.network.subnet_id 
   depends_on = [module.network]
 }
 
@@ -45,5 +52,3 @@ module "loadbalancer" {
   source     = "./modules/gcp/loadbalancer"
   depends_on = [module.gke_cluster]
 }
-
-

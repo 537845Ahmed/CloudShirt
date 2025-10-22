@@ -3,9 +3,9 @@ provider "aws" {
   profile = "default"
 }
 
- provider "google" {
+provider "google" {
   credentials = file("${path.root}/gcp-service-account.json")
-  project     = "k8-cluster-470912"
+  project     = var.project_id
   region      = "europe-west4"
   zone        = "europe-west4-a"
 }
