@@ -1,0 +1,2 @@
+gcs_bucket: "cloudshirt-central-logs"
+aws_region: "eu-west-1"
