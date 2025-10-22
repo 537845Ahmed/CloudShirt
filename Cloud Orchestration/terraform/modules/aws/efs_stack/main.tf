@@ -1,6 +1,6 @@
 resource "aws_cloudformation_stack" "efs" {
   name          = "efs-stack"
-  template_body = file("${path.module}/templates/efs.yml")
+  template_body = file("${path.root}/templates/efs_stack.yml")
 
   tags = {
     Project      = "CloudShirt"

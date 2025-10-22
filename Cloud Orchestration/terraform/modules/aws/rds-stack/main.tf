@@ -5,12 +5,12 @@ variable "db_password" {
 
 resource "aws_cloudformation_stack" "rds" {
   name          = "rds-stack"
-  template_body = file("${path.module}/templates/rds.yml")
+  template_body = file("${path.root}/templates/rds_stack.yml")
 
   parameters = {
-    DBName     = "cloudshirt"
-    DBUser     = "csadmin"
-    DBPassword = var.db_password
+    DBUsername          = "csadmin"
+    DBPassword          = var.db_password
+    DBAllocatedStorage  = "30"
   }
 
   tags = {
