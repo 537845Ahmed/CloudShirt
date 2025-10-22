@@ -1,11 +1,11 @@
 provider "aws" {
-  region  = "eu-west-1"
+  region  = "us-east-1"
   profile = "default"
 }
 
-provider "google" {
+ provider "google" {
   credentials = file("${path.root}/gcp-service-account.json")
-  project     = "cloudshirt-project"
+  project     = "k8-cluster-470912"
   region      = "europe-west4"
   zone        = "europe-west4-a"
 }
