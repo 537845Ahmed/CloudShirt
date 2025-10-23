@@ -220,6 +220,14 @@ Resources:
             chmod +x export-rds.sh
 
             curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/configure-aws.sh
+            
+            sed -i \
+            -e "s|<acceskey>|${AccessKey}|g" \
+            -e "s|<secretaccesskey>|${SecretKey}|g" \
+            -e "s|<sessiontoken>|${SessionToken}|g" \
+            -e "s|<accountid>|${AccountId}|g" \
+            /home/ec2-user/configure-aws.sh
+
             chmod +x configure-aws.sh
 
           - RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
@@ -408,6 +416,14 @@ Resources:
             chmod +x export-rds.sh
 
             curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/configure-aws.sh
+            
+            sed -i \
+            -e "s|<acceskey>|${AccessKey}|g" \
+            -e "s|<secretaccesskey>|${SecretKey}|g" \
+            -e "s|<sessiontoken>|${SessionToken}|g" \
+            -e "s|<accountid>|${AccountId}|g" \
+            /home/ec2-user/configure-aws.sh
+
             chmod +x configure-aws.sh
 
           - RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
