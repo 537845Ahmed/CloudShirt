@@ -219,6 +219,9 @@ Resources:
             curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/export-rds.sh
             chmod +x export-rds.sh
 
+            curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/configure-aws.sh
+            chmod +x configure-aws.sh
+
           - RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
             DBUsername: !ImportValue rds-stack:RDSUsername
             DBPassword: !ImportValue rds-stack:RDSPassword
@@ -403,6 +406,9 @@ Resources:
 
             curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/export-rds.sh
             chmod +x export-rds.sh
+
+            curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/configure-aws.sh
+            chmod +x configure-aws.sh
 
           - RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
             DBUsername: !ImportValue rds-stack:RDSUsername
