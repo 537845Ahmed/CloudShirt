@@ -25,12 +25,15 @@ database="Microsoft.eShopOnWeb.CatalogDb"
 table="dbo.Orders"
 
 # Paden voor bestanden
-export_csv="/mnt/efs/orders.csv"
-tmp_csv="/mnt/efs/orders_tmp.csv"
+export_csv="/tmp/orders.csv"
+tmp_csv="/tmp/orders_tmp.csv"
 
 export PATH=$PATH:/opt/mssql-tools/bin
 
+# bcp -v
+
 echo "Exporteren van $table van $database op $endpoint..."
+#echo "user: $db_user || password: $db_password"
 
 # Exporteer naar tijdelijke CSV
 bcp "$table" out "$tmp_csv" -c -t, -S "$endpoint" -d "$database" -U "$db_user" -P "$db_password" -b 10000
@@ -64,6 +67,7 @@ aws s3 cp "$export_csv" "s3://$bucket/orders.csv"
 
 if [ $? -ne 0 ]; then
     echo "Fout bij uploaden naar S3!"
+    sudo rm /tmp/orders.csv
     exit 1
 fi
 
