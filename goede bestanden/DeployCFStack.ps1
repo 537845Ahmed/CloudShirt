@@ -1,6 +1,7 @@
 # DeployCFStack.ps1
 param(
-    [string]$Region = "us-east-1"
+    [string]$Region = "us-east-1",
+    [string]$BucketName
 )
 
 # ===== Controleer of AWS CLI aanwezig is =====
@@ -47,7 +48,6 @@ foreach ($k in @('aws_access_key_id','aws_secret_access_key','aws_session_token'
 $AccessKey    = $awsData['aws_access_key_id']
 $SecretKey    = $awsData['aws_secret_access_key']
 $SessionToken = $awsData['aws_session_token']
-$BucketName   = Read-Host "Geef naam voor de S3-bucket"
 
 # ===== Stel de omgeving in =====
 $env:AWS_ACCESS_KEY_ID     = $AccessKey
@@ -61,6 +61,13 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "`nFout: de ingevoerde credentials zijn ongeldig of verlopen." -ForegroundColor Red
     exit 1
 }
+
+if ($BucketName -eq "")
+{
+    $BucketName   = Read-Host "Geef naam voor de S3-bucket"
+}
+
+write-host "Bucketname is $BucketName" -ForegroundColor yellow
 
 # ===== Haal automatisch AWS Account ID op =====
 $AccountId = (aws sts get-caller-identity --query "Account" --output text 2>$null)
