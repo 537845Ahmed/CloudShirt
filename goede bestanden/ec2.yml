@@ -4,10 +4,21 @@ Description: >
   nginx reverse proxy, CloudShirt web app, and Filebeat configuration for centralized logging to ELK.
 
 Parameters:
+  AccessKey:
+    Type: String
+  SecretKey:
+    Type: String
+  SessionToken:
+    Type: String
+  AccountId:
+    Type: String
   InstanceType:
     Type: String
     Default: t3.small
     Description: EC2 instance type (t3.small aanbevolen voor .NET)
+  BucketName:
+    Type: String
+    Description: S3-bucket naam
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
     Description: Name of an existing EC2 KeyPair for SSH access
@@ -49,6 +60,14 @@ Resources:
         Fn::Base64: !Sub
           - |
             #!/bin/bash -xe
+            export AWS_ACCESS_KEY_ID=${AccessKey}
+            export AWS_SECRET_ACCESS_KEY=${SecretKey}
+            export AWS_SESSION_TOKEN=${SessionToken}
+            export AWS_DEFAULT_REGION=us-east-1
+            export AWS_ACCOUNT_ID=${AccountId}
+
+            
+
             yum update -y
             yum install -y gcc git unzip curl amazon-linux-extras amazon-efs-utils unixODBC unixODBC-devel
 
@@ -62,6 +81,9 @@ Resources:
             mkdir -p /mnt/efs
             mount -t efs -o tls ${EFS_DNS}:/ /mnt/efs
             echo "${EFS_DNS}:/ /mnt/efs efs defaults,_netdev 0 0" >> /etc/fstab
+
+            echo "${RDSENDPOINT}" > /mnt/efs/rds-endpoint
+            echo "${BucketName}" > /mnt/efs/s3-name
 
             # Nginx directory maken voor logs
             mkdir -p /mnt/efs/nginx
@@ -191,7 +213,11 @@ Resources:
             bcp -v
             sqlcmd -? 
 
+            cd "/home/ec2-user"
+            echo "Current directory: $(pwd)"
+
             curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/export-rds.sh
+            chmod +x export-rds.sh
 
           - RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
             DBUsername: !ImportValue rds-stack:RDSUsername
@@ -222,6 +248,12 @@ Resources:
         Fn::Base64: !Sub 
           - |
             #!/bin/bash -xe
+            export AWS_ACCESS_KEY_ID=${AccessKey}
+            export AWS_SECRET_ACCESS_KEY=${SecretKey}
+            export AWS_SESSION_TOKEN=${SessionToken}
+            export AWS_DEFAULT_REGION=us-east-1
+            export AWS_ACCOUNT_ID=${AccountId}
+
             yum update -y
             yum install -y gcc git unzip curl amazon-linux-extras amazon-efs-utils
 
@@ -235,6 +267,9 @@ Resources:
             mkdir -p /mnt/efs/
             mount -t efs -o tls ${EFS_DNS}:/ /mnt/efs
             echo "${EFS_DNS}:/ /mnt/efs efs defaults,_netdev 0 0" >> /etc/fstab
+
+            echo "${RDSENDPOINT}" > /mnt/efs/rds-endpoint
+            echo "${BucketName}" > /mnt/efs/s3-name
 
             # Nginx directory maken voor logs
             mkdir -p /mnt/efs/nginx
@@ -363,7 +398,11 @@ Resources:
             bcp -v
             sqlcmd -? 
 
+            cd "/home/ec2-user"
+            echo "Current directory: $(pwd)"
+
             curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/export-rds.sh
+            chmod +x export-rds.sh
 
           - RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
             DBUsername: !ImportValue rds-stack:RDSUsername
