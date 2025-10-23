@@ -5,7 +5,7 @@ Parameters:
   BucketName:
     Type: String
     Description: Naam van de S3 bucket
-    Default: rds-export-bucket-demo
+    Default: rds-export-bucket-cloudshirt-luca
 
 Resources:
   RDSExportBucket:
