@@ -1,10 +1,21 @@
 Description: CloudShirt .NET Auto Scaling Group for spike traffic (6-8 PM ET)
 
 Parameters:
+  AccessKey:
+    Type: String
+  SecretKey:
+    Type: String
+  SessionToken:
+    Type: String
+  AccountId:
+    Type: String
   InstanceType:
     Type: String
     Default: t3.small
     Description: EC2 instance for ASG
+  BucketName:
+    Type: String
+    Description: S3-bucket naam
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
     Description: Name of an existing EC2 KeyPair
@@ -30,73 +41,172 @@ Resources:
         SecurityGroupIds:
           - !ImportValue base-stack:InstanceSG
         UserData:
-          Fn::Base64: !Sub |
-            #!/bin/bash -xe
-            yum update -y
-            yum install -y gcc git unzip curl amazon-linux-extras
+          Fn::Base64: !Sub
+            - |
+              #!/bin/bash -xe
+              export AWS_ACCESS_KEY_ID=${AccessKey}
+              export AWS_SECRET_ACCESS_KEY=${SecretKey}
+              export AWS_SESSION_TOKEN=${SessionToken}
+              export AWS_DEFAULT_REGION=us-east-1
+              export AWS_ACCOUNT_ID=${AccountId}
 
-            rpm -Uvh https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
-            yum install -y aspnetcore-runtime-6.0 dotnet-sdk-6.0
+              yum update -y
+              yum install -y gcc git unzip curl amazon-linux-extras amazon-efs-utils unixODBC unixODBC-devel
 
-            amazon-linux-extras install nginx1 -y
-            systemctl enable nginx
+              rpm -Uvh https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
+              yum install -y aspnetcore-runtime-6.0 dotnet-sdk-6.0
 
-            cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
-            server {
-                listen 80;
-                server_name _;
-                location / {
-                    proxy_pass http://127.0.0.1:5000;
-                    proxy_http_version 1.1;
-                    proxy_set_header Upgrade $http_upgrade;
-                    proxy_set_header Connection keep-alive;
-                    proxy_set_header Host $host;
-                    proxy_cache_bypass $http_upgrade;
-                    proxy_set_header X-Real-IP $remote_addr;
-                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                    proxy_set_header X-Forwarded-Proto $scheme;
-                    proxy_buffering off;
-                }
-            }
-            NGINX
+              amazon-linux-extras install nginx1 -y
+              systemctl enable nginx
 
-            APPROOT="/opt/cloudshirt"
-            PUBLISH="$APPROOT/publish"
-            mkdir -p "$APPROOT"
-            chown ec2-user:ec2-user "$APPROOT"
+              # EFS Mount
+              mkdir -p /mnt/efs
+              mount -t efs -o tls ${EFS_DNS}:/ /mnt/efs
+              echo "${EFS_DNS}:/ /mnt/efs efs defaults,_netdev 0 0" >> /etc/fstab
 
-            sudo -u ec2-user bash -lc "
-              set -e
-              git clone --branch ${RepoBranch} ${RepoUrl} $APPROOT/src
-              cd $APPROOT/src/src/Web
-              dotnet restore
-              dotnet publish -c Release -o $PUBLISH
-            "
+              echo "${RDSENDPOINT}" > /mnt/efs/rds-endpoint
+              echo "${BucketName}" > /mnt/efs/s3-name
 
-            cat >/etc/systemd/system/cloudshirt.service <<'SERVICE'
-            [Unit]
-            Description=CloudShirt ASP.NET Core Web App
-            After=network.target
+              # Nginx directory maken voor logs
+              mkdir -p /mnt/efs/nginx
 
-            [Service]
-            WorkingDirectory=/opt/cloudshirt/publish
-            ExecStart=/usr/bin/dotnet /opt/cloudshirt/publish/Web.dll
-            Restart=always
-            RestartSec=5
-            KillSignal=SIGINT
-            SyslogIdentifier=cloudshirt
-            User=ec2-user
-            Environment=ASPNETCORE_ENVIRONMENT=Production
-            Environment=ASPNETCORE_URLS=http://0.0.0.0:5000
+              
+              # Nginx config
+              cat >/etc/nginx/conf.d/cloudshirt.conf <<'NGINX'
+              server {
+                  listen 80;
+                  server_name _;
+                  location / {
+                      proxy_pass http://127.0.0.1:5000;
+                      proxy_http_version 1.1;
+                      proxy_set_header Upgrade $http_upgrade;
+                      proxy_set_header Connection keep-alive;
+                      proxy_set_header Host $host;
+                      proxy_cache_bypass $http_upgrade;
+                      proxy_set_header X-Real-IP $remote_addr;
+                      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                      proxy_set_header X-Forwarded-Proto $scheme;
+                      proxy_buffering off;
+                  }
+                  # Access en error log op EFS wegschrijven
+                  access_log /mnt/efs/nginx/access.log;
+                  error_log /mnt/efs/nginx/error.log;
+              }
+              NGINX
 
-            [Install]
-            WantedBy=multi-user.target
-            SERVICE
+              APPROOT="/opt/cloudshirt"
+              PUBLISH="$APPROOT/publish"
+              mkdir -p "$APPROOT"
+              chown ec2-user:ec2-user "$APPROOT"
 
-            systemctl daemon-reload
-            systemctl enable cloudshirt
-            systemctl start cloudshirt
-            systemctl restart nginx
+              # CloudShirt en DB opzetten
+              sudo -u ec2-user bash -lc "
+                set -e
+                git clone --branch ${RepoBranch} ${RepoUrl} $APPROOT/src
+                cd $APPROOT/src/src/Web
+                sed -i 's/Server.*CatalogDb;/Server=${RDSENDPOINT},1433;User ID=${DBUsername};Password=${DBPassword};Initial Catalog=Microsoft.eShopOnWeb.CatalogDb;/' appsettings.json
+                sed -i 's/Server.*Identity;/Server=${RDSENDPOINT},1433;User ID=${DBUsername};Password=${DBPassword};Initial Catalog=Microsoft.eShopOnWeb.Identity;/' appsettings.json
+                dotnet restore
+                dotnet publish -c Release -o $PUBLISH
+              "
+
+              # Systemd service
+              cat >/etc/systemd/system/cloudshirt.service <<'SERVICE'
+              [Unit]
+              Description=CloudShirt ASP.NET Core Web App
+              After=network.target
+
+              [Service]
+              WorkingDirectory=/opt/cloudshirt/publish
+              ExecStart=/usr/bin/dotnet /opt/cloudshirt/publish/Web.dll
+              Restart=always
+              RestartSec=5
+              KillSignal=SIGINT
+              SyslogIdentifier=cloudshirt
+              User=ec2-user
+              Environment=ASPNETCORE_ENVIRONMENT=Production
+              Environment=ASPNETCORE_URLS=http://0.0.0.0:5000
+
+              [Install]
+              WantedBy=multi-user.target
+              SERVICE
+
+              systemctl daemon-reload
+              systemctl enable cloudshirt
+              systemctl start cloudshirt
+              systemctl restart nginx
+
+              # Install Filebeat
+              rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
+
+              cat <<EOF > /etc/yum.repos.d/elastic.repo
+              [elastic-8.x]
+              name=Elastic repository for 8.x packages
+              baseurl=https://artifacts.elastic.co/packages/8.x/yum
+              gpgcheck=1
+              gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+              enabled=1
+              autorefresh=1
+              type=rpm-md
+              EOF
+
+              yum install -y filebeat
+
+              # Disable default Elasticsearch output (to avoid multiple outputs)
+              sed -i 's/^output.elasticsearch:/#output.elasticsearch:/' /etc/filebeat/filebeat.yml
+              sed -i 's/^  hosts:/#  hosts:/' /etc/filebeat/filebeat.yml
+
+              # Append clean Logstash output block at the end of filebeat.yml
+              cat <<EOT >> /etc/filebeat/filebeat.yml
+
+              output.logstash:
+                hosts: ["${ELKPublicIP}:5044"]
+              EOT
+
+              # Enable system module for Filebeat
+              filebeat modules enable system
+
+              # Configure system module (syslog + auth)
+              cat <<EOF > /etc/filebeat/modules.d/system.yml
+              - module: system
+                syslog:
+                  enabled: true
+                  var.paths: ["/var/log/messages"]
+                auth:
+                  enabled: true
+                  var.paths: ["/var/log/secure"]
+              EOF
+
+              # Enable and start Filebeat
+              systemctl enable filebeat
+              systemctl restart filebeat
+
+              # SQLCMD en BCP
+              curl -O https://packages.microsoft.com/rhel/8/prod/msodbcsql17-17.10.6.1-1.x86_64.rpm
+              ACCEPT_EULA=Y yum localinstall -y msodbcsql17-17.10.6.1-1.x86_64.rpm
+              
+              curl -O https://packages.microsoft.com/rhel/8/prod/mssql-tools-17.10.1.1-1.x86_64.rpm
+              ACCEPT_EULA=Y yum localinstall -y mssql-tools-17.10.1.1-1.x86_64.rpm
+
+              echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> /etc/profile.d/mssql-tools.sh
+              chmod +x /etc/profile.d/mssql-tools.sh
+              source /etc/profile.d/mssql-tools.sh
+
+              bcp -v
+              sqlcmd -? 
+
+              cd "/home/ec2-user"
+              echo "Current directory: $(pwd)"
+
+              curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/export-rds.sh
+              chmod +x export-rds.sh
+
+
+            - RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
+              DBUsername: !ImportValue rds-stack:RDSUsername
+              DBPassword: !ImportValue rds-stack:RDSPassword
+              EFS_DNS: !ImportValue efs-stack:EFSDNS
+              ELKPublicIP: !ImportValue elk-stack:ELKPublicIP
 
   CloudShirtASG:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -111,6 +221,8 @@ Resources:
       VPCZoneIdentifier: 
         - !ImportValue base-stack:CloudShirtFirstSubnet
         - !ImportValue base-stack:CloudShirtSecondSubnet
+      TargetGroupARNs:
+        - !ImportValue WebTargetGroup
       Tags:
         - Key: Name
           Value: CloudShirt-Web-ASG
@@ -132,7 +244,3 @@ Resources:
       DesiredCapacity: 2
       Recurrence: "0 13 * * *"
 
-# Outputs:
-#   ASGName:
-#     Description: Name of the Auto Scaling Group
-#     Value: !Ref CloudShirtASG
