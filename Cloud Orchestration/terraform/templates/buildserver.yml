@@ -4,14 +4,20 @@ Description: >
   initialize Docker Swarm, token wordt weggeschreven naar EFS
 
 Parameters:
-  AccessKey:
+  GCPProjectID:
     Type: String
-  SecretKey:
+    Description: GCP Project ID for Artifact Registry
+  GCPRegion:
     Type: String
-  SessionToken:
+    Default: europe-west4
+    Description: Region for Artifact Registry
+  GCPRepo:
     Type: String
-  AccountId:
+    Default: cloudshirt-docker
+    Description: GCP Artifact Registry repository
+  GCPServiceAccountJson:
     Type: String
+    Description: Base64-encoded GCP service account key  
   InstanceType:
     Type: String
     Default: t3.small
@@ -48,18 +54,28 @@ Resources:
         Fn::Base64: !Sub 
         - |
           #!/bin/bash -xe
-          export AWS_ACCESS_KEY_ID=${AccessKey}
-          export AWS_SECRET_ACCESS_KEY=${SecretKey}
-          export AWS_SESSION_TOKEN=${SessionToken}
-          export AWS_DEFAULT_REGION=us-east-1
-          export AWS_ACCOUNT_ID=${AccountId}
-          
+
           yum update -y
-          yum install -y gcc git unzip curl docker jq nfs-utils amazon-efs-utils
+          yum install -y gcc git unzip curl jq nfs-utils amazon-efs-utils
+          
+          # Voeg Google Cloud SDK repo toe
+          tee /etc/yum.repos.d/google-cloud-sdk.repo << EOL
+          [google-cloud-sdk]
+          name=Google Cloud SDK
+          baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el7-x86_64
+          enabled=1
+          gpgcheck=1
+          repo_gpgcheck=0
+          gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg
+                https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+          EOL
+
+           yum install -y docker google-cloud-sdk
 
           # Docker service starten
           systemctl enable docker
           systemctl start docker
+          sleep 5
 
           # Docker Compose installeren
           curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -81,6 +97,13 @@ Resources:
 
           echo "${RDSENDPOINT}" > /mnt/efs/rds-endpoint
 
+          # GCP service account login
+          echo "${GCPServiceAccountJson}" | base64 --decode > /root/gcp-service-account.json
+          gcloud auth activate-service-account --key-file=/root/gcp-service-account.json
+          gcloud config set project ${GCPProjectID}
+          gcloud auth configure-docker ${GCPRegion}-docker.pkg.dev --quiet
+
+
           cd "/home/ec2-user"
           echo "Current directory: $(pwd)"
 
@@ -90,21 +113,25 @@ Resources:
           echo "Current directory: $(pwd)"
           
           # BASH SCRIPT VOOR ENDPOINT
-          chmod +x endpointsetter.sh
-          ./endpointsetter.sh 
+          chmod +x endpointshetter-2.sh 
+          ./endpointshetter-2.sh 
 
-          # Repositories aanmaken
-          for repo in eshoppublicapi eshopwebmvc; do
-            docker build -t europe-west4-docker.pkg.dev/k8-cluster-470912/cloudshirt-docker/$repo:latest -f Dockerfile.$repo .
-            docker push europe-west4-docker.pkg.dev/k8-cluster-470912/cloudshirt-docker/$repo:latest
-          done
+          # Build en push Docker images naar Google Artifact Registry
+          cd "/home/ec2-user/CloudShirt-1"
+
+          docker build -t ${GCPRegion}-docker.pkg.dev/${GCPProjectID}/${GCPRepo}/eshopwebmvc:latest -f src/Web/Dockerfile .
+          docker push ${GCPRegion}-docker.pkg.dev/${GCPProjectID}/${GCPRepo}/eshopwebmvc:latest
+
+          docker build -t ${GCPRegion}-docker.pkg.dev/${GCPProjectID}/${GCPRepo}/eshoppublicapi:latest -f src/PublicApi/Dockerfile .
+          docker push ${GCPRegion}-docker.pkg.dev/${GCPProjectID}/${GCPRepo}/eshoppublicapi:latest
+
 
           # BASH SCRIPT VOOR IMAGE MAKEN
-          chmod +x build-push-images.sh
-          ./build-push-images.sh
+          # chmod +x build-push-images.sh
+          # ./build-push-images.sh
           
           # DOCKER SWARM DEPLOYEN
-          docker stack deploy -c docker-stack.yml Cloudshirt-Stack
+          # docker stack deploy -c docker-stack.yml Cloudshirt-Stack
 
           # endpoint twee manieren
           # RDS=$(cat /mnt/efs/rds-endpoint.txt)
