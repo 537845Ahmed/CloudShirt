@@ -1,4 +1,33 @@
 ######################################
+# GCP modules
+######################################
+
+module "network" {
+  source = "./modules/gcp/network"
+}
+
+module "artifact_registry" {
+  source       = "./modules/gcp/artifact_registry"
+  project_id   = var.project_id
+  gcp_region   = var.gcp_region
+  gcp_repo_name = var.gcp_repo_name
+}
+
+module "gke_cluster" {
+  source     = "./modules/gcp/gke_cluster"
+  vpc_id     = module.network.vpc_id
+  subnet_id  = module.network.subnet_id 
+  depends_on = [module.network]
+}
+
+module "loadbalancer" {
+  source     = "./modules/gcp/loadbalancer"
+  depends_on = [module.gke_cluster]
+}
+
+
+
+######################################
 # AWS modules
 ######################################
 
@@ -23,32 +52,9 @@ module "elk" {
 }
 
 module "buildserver" {
-  source     = "./modules/aws/buildserver_stack"
-  depends_on = [module.rds]
-}
-
-
-######################################
-# GCP modules
-######################################
-
-module "network" {
-  source = "./modules/gcp/network"
-}
-
-module "artifact_registry" {
-  source     = "./modules/gcp/artifact_registry"
-  depends_on = [module.network]
-}
-
-module "gke_cluster" {
-  source     = "./modules/gcp/gke_cluster"
-  vpc_id     = module.network.vpc_id
-  subnet_id  = module.network.subnet_id 
-  depends_on = [module.network]
-}
-
-module "loadbalancer" {
-  source     = "./modules/gcp/loadbalancer"
-  depends_on = [module.gke_cluster]
+  source                  = "./modules/aws/buildserver_stack"
+  project_id              = var.project_id
+  gcp_region              = var.gcp_region
+  gcp_repo_name           = var.gcp_repo_name
+  gcp_service_account_json = var.gcp_service_account_json
 }
