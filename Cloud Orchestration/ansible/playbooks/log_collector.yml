@@ -1,25 +1,26 @@
 ---
 - name: Collect logs from GKE and upload to GCS
   hosts: local
-  vars:
-    gcp_project: "k8-cluster-470912"
-    gcp_region: "europe-west4"
-    cluster_name: "cloudshirt-gke"
-    log_bucket: "cloudshirt-logs"
-    namespace: "cloudshirt"
+  vars_files:
+    - ../roles/log_collection/vars/main.yml
+
   tasks:
     - name: Authenticate with GCP
       command: gcloud auth activate-service-account --key-file=/root/gcp-key.json
 
     - name: Get GKE credentials
-      command: gcloud container clusters get-credentials {{ cluster_name }} --region {{ gcp_region }} --project {{ gcp_project }}
+      command: gcloud container clusters get-credentials {{ cluster_name }} --region {{ gcp_region }} --project {{ gcp_project_id }}
 
-    - name: Collect pod logs
+    - name: Create local log directory
+      file:
+        path: "{{ local_log_dir }}"
+        state: directory
+
+    - name: Collect logs from pods
       shell: |
-        mkdir -p /tmp/gke-logs
         for pod in $(kubectl get pods -n {{ namespace }} -o name); do
-          kubectl logs -n {{ namespace }} $pod > /tmp/gke-logs/$(basename $pod).log
+          kubectl logs -n {{ namespace }} $pod > {{ local_log_dir }}/$(basename $pod).log
         done
 
-    - name: Upload logs to GCS
-      command: gcloud storage cp /tmp/gke-logs gs://{{ log_bucket }}/ --recursive
+    - name: Upload logs to GCS bucket
+      command: gsutil cp {{ local_log_dir }}/*.log gs://{{ log_bucket }}/

@@ -6,6 +6,8 @@
     gcp_region: "europe-west4"
     cluster_name: "cloudshirt-gke"
     namespace: "cloudshirt"
+    ingress_host: "cloudshirt.example.com"
+    replica_count: 5
     image_repo: "europe-west4-docker.pkg.dev/k8-cluster-470912/cloudshirt-docker"
     deployments:
       - name: eshopwebmvc
@@ -25,6 +27,6 @@
       command: kubectl create namespace {{ namespace }}
       ignore_errors: yes
 
-    - name: Deploy CloudShirt applications
+    - name: Deploy CloudShirt apps
       include_role:
         name: gke_deploy
