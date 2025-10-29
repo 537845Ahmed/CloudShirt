@@ -95,12 +95,8 @@ Resources:
 
           # Repositories aanmaken
           for repo in eshoppublicapi eshopwebmvc; do
-            if ! aws ecr describe-repositories --repository-names $repo --region us-east-1 >/dev/null 2>&1; then
-              echo "Repository $repo bestaat nog niet — wordt aangemaakt..."
-              aws ecr create-repository --repository-name $repo --region us-east-1
-            else
-              echo "Repository $repo bestaat al."
-            fi
+            docker build -t europe-west4-docker.pkg.dev/k8-cluster-470912/cloudshirt-docker/$repo:latest -f Dockerfile.$repo .
+            docker push europe-west4-docker.pkg.dev/k8-cluster-470912/cloudshirt-docker/$repo:latest
           done
 
           # BASH SCRIPT VOOR IMAGE MAKEN
