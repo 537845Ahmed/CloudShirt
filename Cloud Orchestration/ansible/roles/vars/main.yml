@@ -1,4 +1,28 @@
-artifact_repo: "europe-west4-docker.pkg.dev/cloudshirt-project/cloudshirt-repo/cloudshirt:latest"
-db_password: "Welkom123!"
+# ==== GCP & cluster ====
+gcp_project_id: "k8-cluster-470912"
+gcp_region: "europe-west4"
+cluster_name: "cloudshirt-gke"
+namespace: "cloudshirt"
+ingress_host: "cloudshirt.example.com"
+
+# ==== Replica's ====
 replica_count: 5
 
+# ==== Artifact Registry ====
+gcp_repo_name: "cloudshirt-docker"
+image_repo: "{{ gcp_region }}-docker.pkg.dev/{{ gcp_project_id }}/{{ gcp_repo_name }}"
+
+# ==== Database (AWS RDS) ====
+# Tip: zet db_password later in Ansible Vault
+rds_endpoint: "cloudshirt-db.ctuckmei09i6.us-east-1.rds.amazonaws.com"
+db_user: "csadmin"
+db_password: "Welkom123!"
+
+# ==== App images & poorten ====
+deployments:
+  - name: eshopwebmvc
+    image: "{{ image_repo }}/eshopwebmvc:latest"
+    port: 80
+  - name: eshoppublicapi
+    image: "{{ image_repo }}/eshoppublicapi:latest"
+    port: 8080

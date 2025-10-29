@@ -7,7 +7,7 @@ metadata:
     kubernetes.io/ingress.class: "gce"
 spec:
   rules:
-    - host: cloudshirt.example.com
+    - host: {{ ingress_host }}
       http:
         paths:
           - path: /

@@ -4,7 +4,7 @@ metadata:
   name: {{ item.name }}
   namespace: {{ namespace }}
 spec:
-  replicas: 3
+  replicas: {{ replica_count }}
   selector:
     matchLabels:
       app: {{ item.name }}
