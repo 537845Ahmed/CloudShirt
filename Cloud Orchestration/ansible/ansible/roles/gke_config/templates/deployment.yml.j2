@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ item.name }}
+  namespace: {{ namespace }}
+spec:
+  replicas: {{ replica_count }}
+  selector:
+    matchLabels:
+      app: {{ item.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ item.name }}
+    spec:
+      containers:
+        - name: {{ item.name }}
+          image: {{ item.image }}
+          ports:
+            - containerPort: {{ item.port }}
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+            - name: DB_CONNECTION
+              valueFrom:
+                secretKeyRef:
+                  name: rds-secret
+                  key: connection

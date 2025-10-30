@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudshirt-deployment
+spec:
+  replicas: {{ replica_count }}
+  selector:
+    matchLabels:
+      app: cloudshirt
+  template:
+    metadata:
+      labels:
+        app: cloudshirt
+    spec:
+      containers:
+        - name: cloudshirt
+          image: {{ artifact_repo }}
+          ports:
+            - containerPort: 80
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: db-username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: db-password
