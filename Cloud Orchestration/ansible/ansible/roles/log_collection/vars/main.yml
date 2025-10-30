@@ -1,6 +1,0 @@
-gcp_project_id: "k8-cluster-470912"
-gcp_region: "europe-west4"
-cluster_name: "cloudshirt-gke"
-namespace: "cloudshirt"
-log_bucket: "cloudshirt-logs"
-local_log_dir: "./collected_logs"
