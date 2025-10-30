@@ -11,13 +11,14 @@ module "artifact_registry" {
   project_id   = var.project_id
   gcp_region   = var.gcp_region
   gcp_repo_name = var.gcp_repo_name
+  depends_on   = [module.network]   # <-- eerst netwerk
 }
 
 module "gke_cluster" {
   source     = "./modules/gcp/gke_cluster"
   vpc_id     = module.network.vpc_id
   subnet_id  = module.network.subnet_id 
-  depends_on = [module.network]
+  depends_on = [module.artifact_registry]  # <-- pas na artifact
 }
 
 module "loadbalancer" {
@@ -52,9 +53,10 @@ module "elk" {
 }
 
 module "buildserver" {
-  source                  = "./modules/aws/buildserver_stack"
-  project_id              = var.project_id
-  gcp_region              = var.gcp_region
-  gcp_repo_name           = var.gcp_repo_name
+  source                   = "./modules/aws/buildserver_stack"
+  project_id               = var.project_id
+  gcp_region               = var.gcp_region
+  gcp_repo_name            = var.gcp_repo_name
   gcp_service_account_json = var.gcp_service_account_json
+  depends_on               = [module.efs, module.rds, module.elk] # <-- wacht tot infra klaar is
 }

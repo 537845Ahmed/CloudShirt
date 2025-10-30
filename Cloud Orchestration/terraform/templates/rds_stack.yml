@@ -70,4 +70,3 @@ Outputs:
     Value: !Ref DBPassword
     Export:
       Name: !Sub "${AWS::StackName}:RDSPassword"
-
