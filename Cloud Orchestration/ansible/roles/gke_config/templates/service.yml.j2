@@ -9,6 +9,6 @@ spec:
   ports:
     - name: http
       port: 80
-      targetPort: 5098
+      targetPort: {{ item.port }}
   type: ClusterIP
 

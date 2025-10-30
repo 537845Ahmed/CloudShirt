@@ -10,10 +10,19 @@ spec:
     - host: {{ ingress_host }}
       http:
         paths:
+          # Web frontend
           - path: /
             pathType: Prefix
             backend:
               service:
                 name: eshopwebmvc-svc
+                port:
+                  number: 80
+          # PublicAPI
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: eshoppublicapi-svc
                 port:
                   number: 80
