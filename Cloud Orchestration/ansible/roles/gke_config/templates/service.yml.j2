@@ -4,9 +4,11 @@ metadata:
   name: {{ item.name }}-svc
   namespace: {{ namespace }}
 spec:
-  type: ClusterIP
   selector:
     app: {{ item.name }}
   ports:
-    - port: {{ item.port }}
-      targetPort: {{ item.port }}
+    - name: http
+      port: 80
+      targetPort: 5098
+  type: ClusterIP
+

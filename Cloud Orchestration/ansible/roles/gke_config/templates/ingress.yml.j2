@@ -4,7 +4,7 @@ metadata:
   name: cloudshirt-ingress
   namespace: {{ namespace }}
   annotations:
-    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.class: gce
 spec:
   rules:
     - host: {{ ingress_host }}

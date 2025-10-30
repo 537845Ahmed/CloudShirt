@@ -1,24 +1,57 @@
 ---
 - name: Configure GKE cluster and deploy CloudShirt app
-  hosts: local
-  vars:
-    gcp_project: "k8-cluster-470912"
-    gcp_region: "europe-west4"
-    cluster_name: "cloudshirt-gke"
-    namespace: "cloudshirt"
-    ingress_host: "cloudshirt.example.com"
-    replica_count: 5
-    image_repo: "europe-west4-docker.pkg.dev/k8-cluster-470912/cloudshirt-docker"
-    deployments:
-      - name: eshopwebmvc
-        image: "{{ image_repo }}/eshopwebmvc:latest"
-        port: 80
-      - name: eshoppublicapi
-        image: "{{ image_repo }}/eshoppublicapi:latest"
-        port: 8080
+  hosts: localhost
   tasks:
+
+    # 1️⃣ Terraform outputs ophalen
+    - name: Retrieve Terraform outputs
+      command: terraform output -json
+      args:
+        chdir: "{{ lookup('env','HOME') }}/CloudShirt/Cloud Orchestration/terraform"
+      register: tf_outputs
+
+    # 2️⃣ Set base facts from Terraform
+    - name: Set base Terraform facts
+      set_fact:
+        gcp_project: "{{ (tf_outputs.stdout | from_json).project_id.value }}"
+        gcp_region: "{{ (tf_outputs.stdout | from_json).gcp_region.value }}"
+        gcp_repo_name: "{{ (tf_outputs.stdout | from_json).gcp_repo_name.value }}"
+        cluster_name: "{{ (tf_outputs.stdout | from_json).gke_cluster_name.value }}"
+        rds_endpoint: "{{ (tf_outputs.stdout | from_json).rds_endpoint.value | default('') }}"
+        namespace: "cloudshirt"
+        replica_count: 5
+        ingress_host: "cloudshirt.example.com"
+
+    # 3️⃣ Build image repo URL
+    - name: Build image repo
+      set_fact:
+        image_repo: "{{ gcp_region }}-docker.pkg.dev/{{ gcp_project }}/{{ gcp_repo_name }}"
+
+    # 4️⃣ Define deployments dynamically ✅
+    - name: Define deployments dynamically
+      set_fact:
+        deployments:
+          - name: eshopwebmvc
+            image: "{{ image_repo }}/eshopwebmvc:latest"
+            port: 80
+          - name: eshoppublicapi
+            image: "{{ image_repo }}/eshoppublicapi:latest"
+            port: 8080
+
+    # 5️⃣ Debug info (optioneel)
+    - name: Debug Terraform variables
+      debug:
+        msg:
+          - "✅ Project: {{ gcp_project }}"
+          - "✅ Region: {{ gcp_region }}"
+          - "✅ Repo: {{ gcp_repo_name }}"
+          - "✅ Cluster: {{ cluster_name }}"
+          - "✅ RDS Endpoint: {{ rds_endpoint }}"
+          - "✅ Image Repo: {{ image_repo }}"
+
+    # 6️⃣ GCP auth, GKE connectie en namespace
     - name: Authenticate with GCP
-      command: gcloud auth activate-service-account --key-file=/root/gcp-key.json
+      command: gcloud auth activate-service-account --key-file="{{ lookup('env','HOME') }}/CloudShirt/Cloud Orchestration/terraform/gcp-service-account.json"
 
     - name: Get GKE credentials
       command: gcloud container clusters get-credentials {{ cluster_name }} --region {{ gcp_region }} --project {{ gcp_project }}
@@ -27,6 +60,21 @@
       command: kubectl create namespace {{ namespace }}
       ignore_errors: yes
 
+ # 7️⃣ Maak Kubernetes secret voor RDS automatisch aan
+    - name: Create or update RDS secret
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: rds-secret
+            namespace: "{{ namespace }}"
+          type: Opaque
+          stringData:
+            connection: "Server={{ rds_endpoint }};Database=Microsoft.eShopOnWeb.CatalogDb;User Id=csadmin;Password=Welkom123!"
+
+ # 7️⃣ Deploy app
     - name: Deploy CloudShirt apps
       include_role:
-        name: gke_deploy
+        name: gke_config
