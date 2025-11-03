@@ -216,10 +216,10 @@ Resources:
             cd "/home/ec2-user"
             echo "Current directory: $(pwd)"
 
-            curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/export-rds.sh
+            curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/assignment1-awsbasics/export-rds.sh
             chmod +x export-rds.sh
 
-            curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/configure-aws.sh
+            curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/assignment1-awsbasics/configure-aws.sh
             
             sed -i \
             -e "s|<acceskey>|${AccessKey}|g" \
@@ -412,10 +412,10 @@ Resources:
             cd "/home/ec2-user"
             echo "Current directory: $(pwd)"
 
-            curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/export-rds.sh
+            curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/assignment1-awsbasics/export-rds.sh
             chmod +x export-rds.sh
 
-            curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/goede%20bestanden/configure-aws.sh
+            curl -O https://raw.githubusercontent.com/537845Ahmed/CloudShirt/refs/heads/main/assignment1-awsbasics/configure-aws.sh
             
             sed -i \
             -e "s|<acceskey>|${AccessKey}|g" \
