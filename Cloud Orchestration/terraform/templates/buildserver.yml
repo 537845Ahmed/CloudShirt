@@ -124,19 +124,6 @@ Resources:
 
           docker build -t ${GCPRegion}-docker.pkg.dev/${GCPProjectID}/${GCPRepo}/eshoppublicapi:latest -f src/PublicApi/Dockerfile .
           docker push ${GCPRegion}-docker.pkg.dev/${GCPProjectID}/${GCPRepo}/eshoppublicapi:latest
-
-
-          # BASH SCRIPT VOOR IMAGE MAKEN
-          # chmod +x build-push-images.sh
-          # ./build-push-images.sh
-          
-          # DOCKER SWARM DEPLOYEN
-          # docker stack deploy -c docker-stack.yml Cloudshirt-Stack
-
-          # endpoint twee manieren
-          # RDS=$(cat /mnt/efs/rds-endpoint.txt)
-          # sed -i "s|<RDS-ENDPOINT>|$RDS|g" <ZET HIER CORRECTE PAD NEER> 
-
           
         - EFS_DNS: !ImportValue efs-stack:EFSDNS
           RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
