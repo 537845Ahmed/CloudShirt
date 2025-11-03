@@ -6,20 +6,6 @@ Description: >
   - Exporteert DNS-naam als output
 
 Resources:
-  # LoadBalancerSG:
-  #   Type: AWS::EC2::SecurityGroup
-  #   Properties:
-  #     GroupDescription: Security Group for Loadbalancer
-  #     VpcId: !ImportValue base-stack:VPC
-  #     SecurityGroupIngress:
-  #       - IpProtocol: tcp
-  #         FromPort: 80
-  #         ToPort: 80
-  #         CidrIp: 0.0.0.0/0
-  #     SecurityGroupEgress:
-  #       - IpProtocol: -1
-  #         CidrIp: 0.0.0.0/0
-
   # EC2-instances
   WebTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -64,3 +50,9 @@ Outputs:
     Value: !GetAtt ApplicationLoadBalancer.DNSName
     Export:
       Name: !Sub "${AWS::StackName}:LoadBalancerDNS"
+
+  WebTargetGroup:
+    Description: ARN of the Target Group for port 5098
+    Value: !Ref WebTargetGroup
+    Export:
+      Name: WebTargetGroup
