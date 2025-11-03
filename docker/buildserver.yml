@@ -109,11 +109,6 @@ Resources:
           
           # DOCKER SWARM DEPLOYEN
           docker stack deploy -c docker-stack.yml Cloudshirt-Stack
-
-          # endpoint twee manieren
-          # RDS=$(cat /mnt/efs/rds-endpoint.txt)
-          # sed -i "s|<RDS-ENDPOINT>|$RDS|g" <ZET HIER CORRECTE PAD NEER> 
-
           
         - EFS_DNS: !ImportValue efs-stack:EFSDNS
           RDSENDPOINT: !ImportValue rds-stack:RDSEndpointAddress
