@@ -2,7 +2,7 @@
 
 param(
     [string]$Region = "us-east-1",
-    [string[]]$StacksToDelete = @("asg-stack","lb-stack","ec2-stack","rds-stack","efs-stack","elk-stack","base-stack")
+    [string[]]$StacksToDelete = @("s3-stack","asg-stack","lb-stack","ec2-stack","rds-stack","efs-stack","elk-stack","base-stack")
 )
 
 # Check of AWS CLI credentials beschikbaar zijn
