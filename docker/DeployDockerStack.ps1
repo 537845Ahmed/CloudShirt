@@ -145,6 +145,6 @@ Deploy-Stack -StackName "rds-stack"         -TemplateFile ".\rds.yml"
 Deploy-Stack -StackName "buildserver-stack" -TemplateFile ".\buildserver.yml" -IncludeCredentials
 Deploy-Stack -StackName "alb-stack"         -TemplateFile ".\docker-loadbalancer.yml"
 Deploy-Stack -StackName "asg-stack"         -TemplateFile ".\dockerasg.yml"   -IncludeCredentials
-# Deploy-Stack -StackName "ec2-stack"         -TemplateFile ".\ec2Docker.yml"   -IncludeCredentials
 
-# Deploy-Stack -StackName "s3-stack"          -TemplateFile ".\s3.yml"
+# EC2 als nodig is
+# Deploy-Stack -StackName "ec2-stack"         -TemplateFile ".\ec2Docker.yml"   -IncludeCredentials
