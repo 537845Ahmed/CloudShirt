@@ -82,8 +82,6 @@ Resources:
           #!/bin/bash
           set -e
 
-          echo "🔸 [0/7] Start ELK installatie op Amazon Linux 2023..."
-
           # Java 11
           sudo yum install -y java-11-amazon-corretto
 
