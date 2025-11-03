@@ -3,14 +3,12 @@
   hosts: localhost
   tasks:
 
-    # 1️⃣ Terraform outputs ophalen
     - name: Retrieve Terraform outputs
       command: terraform output -json
       args:
         chdir: "{{ lookup('env','HOME') }}/CloudShirt/Cloud Orchestration/terraform"
       register: tf_outputs
 
-    # 2️⃣ Set base facts from Terraform
     - name: Set base Terraform facts
       set_fact:
         gcp_project: "{{ (tf_outputs.stdout | from_json).project_id.value }}"
@@ -22,12 +20,10 @@
         replica_count: 5
         ingress_host: "cloudshirt.example.com"
 
-    # 3️⃣ Build image repo URL
     - name: Build image repo
       set_fact:
         image_repo: "{{ gcp_region }}-docker.pkg.dev/{{ gcp_project }}/{{ gcp_repo_name }}"
 
-    # 4️⃣ Define deployments dynamically ✅
     - name: Define deployments dynamically
       set_fact:
         deployments:
@@ -38,18 +34,16 @@
             image: "{{ image_repo }}/eshoppublicapi:latest"
             port: 8080
 
-    # 5️⃣ Debug info (optioneel)
     - name: Debug Terraform variables
       debug:
         msg:
-          - "✅ Project: {{ gcp_project }}"
-          - "✅ Region: {{ gcp_region }}"
-          - "✅ Repo: {{ gcp_repo_name }}"
-          - "✅ Cluster: {{ cluster_name }}"
-          - "✅ RDS Endpoint: {{ rds_endpoint }}"
-          - "✅ Image Repo: {{ image_repo }}"
+          - "Project: {{ gcp_project }}"
+          - "Region: {{ gcp_region }}"
+          - "Repo: {{ gcp_repo_name }}"
+          - "Cluster: {{ cluster_name }}"
+          - "RDS Endpoint: {{ rds_endpoint }}"
+          - "Image Repo: {{ image_repo }}"
 
-    # 6️⃣ GCP auth, GKE connectie en namespace
     - name: Authenticate with GCP
       command: gcloud auth activate-service-account --key-file="{{ lookup('env','HOME') }}/CloudShirt/Cloud Orchestration/terraform/gcp-service-account.json"
 
@@ -60,7 +54,6 @@
       command: kubectl create namespace {{ namespace }}
       ignore_errors: yes
 
- # 7️⃣ Maak Kubernetes secret voor RDS automatisch aan
     - name: Create or update RDS secret
       kubernetes.core.k8s:
         state: present
@@ -74,7 +67,6 @@
           stringData:
             connection: "Server={{ rds_endpoint }};Database=Microsoft.eShopOnWeb.CatalogDb;User Id=csadmin;Password=Welkom123!"
 
- # 7️⃣ Deploy app
     - name: Deploy CloudShirt apps
       include_role:
         name: gke_config
