@@ -244,7 +244,7 @@ Resources:
       AutoScalingGroupName: !Ref CloudShirtASG
       ScheduledActionName: ScaleOutSpikeHours
       DesiredCapacity: 3
-      Recurrence: "0 12 * * *"
+      Recurrence: "0 18 * * *"
 
   ScaleInScheduledAction:
     Type: AWS::AutoScaling::ScheduledAction
@@ -252,5 +252,5 @@ Resources:
       AutoScalingGroupName: !Ref CloudShirtASG
       ScheduledActionName: ScaleInAfterSpike
       DesiredCapacity: 2
-      Recurrence: "0 13 * * *"
+      Recurrence: "0 20 * * *"
 
